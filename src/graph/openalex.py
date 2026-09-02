@@ -111,11 +111,14 @@ class OpenAlexClient:
         per_page: int = MAX_PER_PAGE,
         max_retries: int = 5,
         backoff: float = 1.0,
+        min_request_interval: float = 0.1,
         timeout: float = 30.0,
     ) -> None:
         self.per_page = min(per_page, MAX_PER_PAGE)
         self.max_retries = max_retries
         self.backoff = backoff
+        self.min_request_interval = min_request_interval
+        self._next_request_at = 0.0
 
         contact = mailto or os.environ.get("OPENALEX_MAILTO")
         self._client = httpx.Client(
@@ -182,8 +185,16 @@ class OpenAlexClient:
                 yield Work.model_validate(payload)
             cursor = (page.get("meta") or {}).get("next_cursor")
 
+    def _throttle(self) -> None:
+        """Hold requests to the documented ten per second."""
+        wait = self._next_request_at - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        self._next_request_at = time.monotonic() + self.min_request_interval
+
     def _get(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
         for attempt in range(self.max_retries):
+            self._throttle()
             response = self._client.get(path, params=params)
             if response.status_code in _RETRY_STATUS:
                 time.sleep(self._retry_delay(response, attempt))

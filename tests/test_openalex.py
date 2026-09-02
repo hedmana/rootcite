@@ -30,6 +30,7 @@ def work_payload(work_id="W1", **overrides):
 
 
 def client_for(handler, **kwargs):
+    kwargs.setdefault("min_request_interval", 0)
     return OpenAlexClient(transport=httpx.MockTransport(handler), **kwargs)
 
 
@@ -226,3 +227,21 @@ def test_title_falls_back_to_display_name():
     payload = work_payload(title=None, display_name="Gated Graph Sequence Neural Networks")
 
     assert Work.model_validate(payload).title == "Gated Graph Sequence Neural Networks"
+
+
+def test_requests_are_throttled_to_the_configured_interval(monkeypatch):
+    slept = []
+    monkeypatch.setattr("time.sleep", slept.append)
+    monkeypatch.setattr("time.monotonic", lambda: 100.0)
+    cursors = ["page-2", None]
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={"results": [work_payload()], "meta": {"next_cursor": cursors.pop(0)}},
+        )
+
+    client = OpenAlexClient(transport=httpx.MockTransport(handler), min_request_interval=0.25)
+    list(client.citing_works("W1"))
+
+    assert slept == [0.25]
