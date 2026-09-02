@@ -5,8 +5,6 @@
 # crawler, the model and the narrative prompts all read their subject matter
 # from here. To add a field, copy this file and change the values.
 #
-# Values below are placeholders. They are resolved against the live OpenAlex
-# API in PR 4, where the crawler first needs them.
 
 name: gnn
 display_name: Graph Neural Networks
@@ -20,15 +18,23 @@ description: >
 
 # OpenAlex topic the field is delimited by. Topics superseded the older
 # `concepts` taxonomy, which OpenAlex has deprecated and no longer populates.
-topic_id: null
+topic_id: T11273  # "Advanced Graph Neural Networks"
 
 # Papers the snowball crawl starts from. OpenAlex work IDs.
-seed_papers: []
+seed_papers:
+  - W2116341502  # The Graph Neural Network Model (2008)
+  - W1662382123  # Spectral Networks and Locally Connected Networks on Graphs (2013)
+  - W2173027866  # Convolutional Networks on Graphs for Learning Molecular Fingerprints (2015)
+  - W2244807774  # Gated Graph Sequence Neural Networks (2015)
+  - W2519887557  # Semi-Supervised Classification with Graph Convolutional Networks (2016)
+  - W2606780347  # Neural Message Passing for Quantum Chemistry (2017)
+  - W2624431344  # Inductive Representation Learning on Large Graphs (2017)
+  - W4297733535  # Graph Attention Networks (2017)
 
 crawl:
   # How many citation hops to expand outward from the seeds.
   hop_depth: 2
   # Publication years to keep. Bounds are inclusive; null means unbounded.
   date_range:
-    start: null
-    end: null
+    start: 1980
+    end: 2025
