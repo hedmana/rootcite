@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Crawl output, graph snapshots, model checkpoints
+data/*
+!data/.gitkeep
+*.parquet
+*.pt
+*.ckpt
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
