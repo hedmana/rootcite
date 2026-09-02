@@ -1,0 +1,9 @@
+# Full-stack local run. Services are wired up as the pieces land (PR 15);
+# each is listed here so the eventual topology is visible from the start.
+#
+# services:
+#   api:        FastAPI lineage + narrative endpoints        (PR 12)
+#   frontend:   React + Vite client                          (PR 13)
+#   pipeline:   one-shot crawl + graph build                 (PR 15)
+#
+# Until then this file is intentionally inert.
