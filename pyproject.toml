@@ -7,10 +7,17 @@ license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "httpx>=0.28.1",
+    "networkx>=3.6.1",
     "pandas>=3.0.5",
     "pyarrow>=25.0.1",
     "pydantic>=2.13.5",
     "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+notebooks = [
+    "ipykernel>=7.3.0",
+    "matplotlib>=3.11.1",
 ]
 
 [dependency-groups]
@@ -33,6 +40,10 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "N", "SIM", "UP", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# A notebook has to put the source tree on sys.path before it can import from it.
+"notebooks/*.ipynb" = ["E402"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
