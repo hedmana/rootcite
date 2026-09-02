@@ -49,7 +49,7 @@ name: gnn
 display_name: Graph Neural Networks
 description: >
   Neural network architectures that operate directly on graph-structured data...
-concept_id: null        # OpenAlex concept delimiting the field
+topic_id: null          # OpenAlex topic delimiting the field
 seed_papers: []         # OpenAlex work IDs the crawl starts from
 crawl:
   hop_depth: 2

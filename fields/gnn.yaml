@@ -18,8 +18,9 @@ description: >
   learning representations of nodes, edges and whole graphs by propagating
   information along the edges of the graph.
 
-# OpenAlex concept the field is delimited by.
-concept_id: null
+# OpenAlex topic the field is delimited by. Topics superseded the older
+# `concepts` taxonomy, which OpenAlex has deprecated and no longer populates.
+topic_id: null
 
 # Papers the snowball crawl starts from. OpenAlex work IDs.
 seed_papers: []
