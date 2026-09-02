@@ -3,6 +3,29 @@
 This is a solo project, but it is built as if it were not. The conventions below
 are the point, not the overhead.
 
+## Setup
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/); Python is pinned
+to 3.12 in `.python-version`.
+
+```sh
+uv sync --all-extras --dev     # create .venv and install everything
+uv run pre-commit install      # lint and format on every commit
+```
+
+Day to day:
+
+```sh
+uv run pytest                  # tests
+uv run ruff check .            # lint
+uv run ruff format .           # format
+uv run pre-commit run -a       # everything CI runs, locally
+```
+
+Add a runtime dependency with `uv add <pkg>`, a dev one with
+`uv add --dev <pkg>`. Commit the resulting `uv.lock`: CI installs with
+`--locked` and fails if the lockfile is stale.
+
 ## Workflow
 
 Every change follows the same loop:
