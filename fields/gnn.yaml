@@ -1,0 +1,33 @@
+# Field configuration contract.
+#
+# Every field the pipeline can be pointed at is one file in this directory.
+# Nothing else in the repository may contain field-specific knowledge: the
+# crawler, the model and the narrative prompts all read their subject matter
+# from here. To add a field, copy this file and change the values.
+#
+# Values below are placeholders. They are resolved against the live OpenAlex
+# API in PR 4, where the crawler first needs them.
+
+name: gnn
+display_name: Graph Neural Networks
+
+# Passed verbatim into narrative prompts, so it must read as prose rather than
+# as a keyword list.
+description: >
+  Neural network architectures that operate directly on graph-structured data,
+  learning representations of nodes, edges and whole graphs by propagating
+  information along the edges of the graph.
+
+# OpenAlex concept the field is delimited by.
+concept_id: null
+
+# Papers the snowball crawl starts from. OpenAlex work IDs.
+seed_papers: []
+
+crawl:
+  # How many citation hops to expand outward from the seeds.
+  hop_depth: 2
+  # Publication years to keep. Bounds are inclusive; null means unbounded.
+  date_range:
+    start: null
+    end: null
