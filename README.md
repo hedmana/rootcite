@@ -59,6 +59,22 @@ crawl:
 Pointing the tool at a different literature means writing a second file in
 `fields/`, not editing the crawler, the model or the prompts.
 
+## Running it
+
+Each stage writes into `data/` and the next reads from there.
+
+```sh
+uv run python -m graph.crawler --field gnn      # snowball crawl from the seed papers
+uv run python -m graph.build --field gnn        # clean it into a dated snapshot
+uv run python -m gnn.dataset --field gnn        # cut the temporal link-prediction split
+uv run python -m gnn.train --field gnn          # fit, and score on citations it never saw
+uv run python -m llm.narrative --field gnn --target W2519887557
+```
+
+The last command is what the rest is for: the ancestors that carried the paper,
+why, and cited to the abstracts it read. `python -m gnn.originators` prints the
+same ranking without the prose, next to the unlearned baselines it has to beat.
+
 ## Model backends
 
 The narrative layer talks to one interface with three backends behind it. Which
