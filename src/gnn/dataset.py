@@ -28,12 +28,15 @@ from graph.crawler import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+# `cited_by_count` is deliberately absent. OpenAlex reports it as of the crawl,
+# so it counts citations made after the split point: a feature that tells the
+# model which papers the future rewards is the leak the temporal split exists
+# to prevent.
 FEATURE_NAMES = (
     "year_scaled",
     "is_dated",
     "log_in_degree",
     "log_out_degree",
-    "log_cited_by_count",
     "log_author_count",
 )
 
@@ -76,11 +79,6 @@ class LinkDataset:
     report: SplitReport
 
 
-def _attribute(graph: nx.DiGraph, node: str, name: str, default: float) -> float:
-    value = graph.nodes[node].get(name)
-    return default if is_missing(value) else float(value)
-
-
 def _years(graph: nx.DiGraph, node_ids: list[str]) -> Tensor:
     years = [
         UNDATED if is_missing(year := graph.nodes[node].get("publication_year")) else int(year)
@@ -99,9 +97,6 @@ def _features(graph: nx.DiGraph, node_ids: list[str], past: Tensor, years: Tenso
     )
     scaled = torch.where(dated, (years - floor) / span, torch.zeros(count))
 
-    cited_by = torch.tensor(
-        [_attribute(graph, node, "cited_by_count", 0.0) for node in node_ids], dtype=torch.float
-    )
     authors = torch.tensor(
         [len(graph.nodes[node].get("authors") or []) for node in node_ids], dtype=torch.float
     )
@@ -111,7 +106,6 @@ def _features(graph: nx.DiGraph, node_ids: list[str], past: Tensor, years: Tenso
             dated.float(),
             torch.bincount(past[1], minlength=count).float().log1p(),
             torch.bincount(past[0], minlength=count).float().log1p(),
-            cited_by.log1p(),
             authors.log1p(),
         ],
         dim=1,
