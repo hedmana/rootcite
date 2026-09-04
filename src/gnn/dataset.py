@@ -87,6 +87,21 @@ def _years(graph: nx.DiGraph, node_ids: list[str]) -> Tensor:
     return torch.tensor(years, dtype=torch.long)
 
 
+def index_graph(graph: nx.DiGraph) -> tuple[list[str], Tensor, Tensor]:
+    """Fix a node ordering, and express the citations as positions in it."""
+    node_ids = list(graph.nodes)
+    position = {node: order for order, node in enumerate(node_ids)}
+    edges = (
+        torch.tensor(
+            [(position[source], position[target]) for source, target in graph.edges],
+            dtype=torch.long,
+        )
+        .reshape(-1, 2)
+        .t()
+    )
+    return node_ids, _years(graph, node_ids), edges
+
+
 def _features(graph: nx.DiGraph, node_ids: list[str], past: Tensor, years: Tensor) -> Tensor:
     """Node features derived from the training edges alone, so nothing leaks backwards."""
     count = len(node_ids)
@@ -183,18 +198,8 @@ def build_dataset(
     seed: int = 0,
 ) -> LinkDataset:
     """Cut a graph into train, validation and test link-prediction views."""
-    node_ids = list(graph.nodes)
+    node_ids, years, edges = index_graph(graph)
     count = len(node_ids)
-    index = {node: position for position, node in enumerate(node_ids)}
-    years = _years(graph, node_ids)
-
-    edges = (
-        torch.tensor(
-            [(index[source], index[target]) for source, target in graph.edges], dtype=torch.long
-        )
-        .reshape(-1, 2)
-        .t()
-    )
     edge_years = years[edges[0]] if edges.numel() else torch.empty(0, dtype=torch.long)
     dated = edge_years != UNDATED
 
@@ -296,6 +301,18 @@ def prepare_field(
     )
     dataset.report.log()
     return save_dataset(snapshot, dataset), dataset.report
+
+
+def observed_view(graph: nx.DiGraph) -> tuple[list[str], Data]:
+    """Every node and every citation on record, featurised the way training was.
+
+    The temporal split exists to measure the model honestly. Scoring is not
+    measurement: nothing is held back, because nothing is being tested.
+    """
+    node_ids, years, edges = index_graph(graph)
+    return node_ids, Data(
+        x=_features(graph, node_ids, edges, years), edge_index=edges, num_nodes=len(node_ids)
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
