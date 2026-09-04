@@ -24,6 +24,7 @@ class OpenAIProvider(Provider):
     name = "openai"
     default_model = "gpt-5"
     key_variable = "OPENAI_API_KEY"
+    accepts_base_url = True
     token_parameter = "max_completion_tokens"
 
     def __init__(self, config: ProviderConfig, client: Any | None = None) -> None:
@@ -70,6 +71,9 @@ class LocalProvider(OpenAIProvider):
     name = "local"
     default_model = "llama3.1"
     default_base_url = "http://localhost:11434/v1"
+    # Deliberately not OPENAI_API_KEY. Whatever is listening on a local port is
+    # not the account that key belongs to, and it would arrive in a header.
+    key_variable = "ROOTCITE_LOCAL_API_KEY"
     token_parameter = "max_tokens"
 
     def answer_as(self, prompt: str, schema: dict, *, system: str | None = None) -> Completion:

@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from llm import ClaudeProvider, LocalProvider, OpenAIProvider, load_provider
-from llm.base import ProviderConfig, RefusalError, strict_schema
+from llm.base import ProviderConfig, RefusalError, checked_base_url, strict_schema
 
 ENVIRONMENT = (
     "ROOTCITE_LLM_PROVIDER",
@@ -13,6 +13,7 @@ ENVIRONMENT = (
     "ROOTCITE_LLM_BASE_URL",
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
+    "ROOTCITE_LOCAL_API_KEY",
 )
 
 
@@ -111,9 +112,9 @@ def test_the_model_can_be_changed_without_touching_code(monkeypatch):
     assert load_provider("local").config.model == "qwen3"
 
 
-def test_a_local_runtime_listens_somewhere_by_default_and_anywhere_on_request():
+def test_a_local_runtime_listens_on_ollamas_port_unless_told_otherwise():
     assert load_provider("local").config.base_url == "http://localhost:11434/v1"
-    assert load_provider("local", base_url="http://box:8000/v1").config.base_url
+    assert load_provider("local", base_url="http://127.0.0.1:8000/v1").config.base_url
 
 
 def test_claude_is_asked_to_think_and_allowed_to_fall_back():
@@ -219,3 +220,50 @@ def test_the_schema_travels_as_json_the_model_can_read():
 
     instructed = client.last["messages"][-1]["content"]
     assert json.loads(instructed[instructed.index("{") :])["properties"]["work_id"]
+
+
+def test_the_hosted_key_is_never_handed_to_whatever_is_on_a_local_port(monkeypatch):
+    """Port 11434 is not the account that key belongs to, and it arrives in a header."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-REAL-hosted-key")
+
+    assert load_provider("local").client.api_key != "sk-REAL-hosted-key"
+
+
+def test_a_local_runtime_started_with_a_key_gets_that_key(monkeypatch):
+    monkeypatch.setenv("ROOTCITE_LOCAL_API_KEY", "vllm-token")
+
+    assert load_provider("local").client.api_key == "vllm-token"
+
+
+@pytest.mark.parametrize(
+    "url", ["http://localhost:11434/v1", "http://127.0.0.1:8000/v1", "http://[::1]:8000/v1"]
+)
+def test_plain_http_is_allowed_to_this_machine(url):
+    assert checked_base_url(url) == url
+
+
+@pytest.mark.parametrize("url", ["http://elsewhere.example/v1", "http://10.0.0.9:8000/v1"])
+def test_plain_http_is_refused_to_anywhere_else(url):
+    with pytest.raises(ValueError, match="plain http"):
+        checked_base_url(url)
+
+
+def test_a_scheme_that_is_not_http_is_refused():
+    with pytest.raises(ValueError, match="must be http"):
+        checked_base_url("file:///etc/passwd")
+
+
+def test_a_redirected_endpoint_cannot_carry_the_hosted_key_off_in_the_clear(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-REAL-hosted-key")
+    monkeypatch.setenv("ROOTCITE_LLM_BASE_URL", "http://elsewhere.example/v1")
+
+    with pytest.raises(ValueError, match="plain http"):
+        load_provider("openai")
+
+
+def test_claude_talks_to_its_own_api_and_nowhere_else(monkeypatch):
+    with pytest.raises(ValueError, match="takes no base url"):
+        load_provider("claude", base_url="https://elsewhere.example/v1")
+
+    monkeypatch.setenv("ROOTCITE_LLM_BASE_URL", "https://elsewhere.example/v1")
+    assert load_provider("claude").config.base_url is None

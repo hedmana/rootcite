@@ -16,7 +16,9 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from ipaddress import ip_address
 from typing import ClassVar, TypeVar
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ValidationError
 
@@ -25,6 +27,35 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_TOKENS = 16000
 
 Schema = TypeVar("Schema", bound=BaseModel)
+
+
+LOOPBACK_NAMES = frozenset({"localhost"})
+
+
+def _is_loopback(host: str | None) -> bool:
+    if host is None:
+        return False
+    if host in LOOPBACK_NAMES:
+        return True
+    try:
+        return ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def checked_base_url(url: str) -> str:
+    """Refuse to send prompts, or a key, somewhere they cannot be recalled from.
+
+    A local runtime needs no TLS because nothing leaves the loopback interface.
+    The same URL aimed at another host would put every prompt, and the
+    Authorization header carrying the key, on the wire in clear text.
+    """
+    address = urlsplit(url)
+    if address.scheme not in ("http", "https"):
+        raise ValueError(f"base url must be http or https, not {address.scheme!r}")
+    if address.scheme == "http" and not _is_loopback(address.hostname):
+        raise ValueError(f"refusing plain http to {address.hostname!r}: use https or loopback")
+    return url
 
 
 class ProviderError(RuntimeError):
@@ -75,6 +106,7 @@ class Provider(ABC):
     name: ClassVar[str]
     default_model: ClassVar[str]
     default_base_url: ClassVar[str | None] = None
+    accepts_base_url: ClassVar[bool] = False
     key_variable: ClassVar[str]
 
     def __init__(self, config: ProviderConfig) -> None:
