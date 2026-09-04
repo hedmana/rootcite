@@ -59,6 +59,29 @@ crawl:
 Pointing the tool at a different literature means writing a second file in
 `fields/`, not editing the crawler, the model or the prompts.
 
+## Model backends
+
+The narrative layer talks to one interface with three backends behind it. Which
+one answers is set in the environment, never in code.
+
+| Variable                | Meaning                                       |
+| ----------------------- | --------------------------------------------- |
+| `ROOTCITE_LLM_PROVIDER` | `claude`, `openai` or `local`                 |
+| `ROOTCITE_LLM_MODEL`    | Overrides the backend's default model         |
+| `ROOTCITE_LLM_BASE_URL` | Where a local runtime is listening            |
+| `ANTHROPIC_API_KEY`     | Read by the Anthropic SDK                     |
+| `OPENAI_API_KEY`        | Read by the OpenAI SDK                        |
+
+With nothing set the choice falls to whichever key is present, and finally to a
+model on this machine, which is the one option that needs no account. Ollama,
+LM Studio, vLLM and llama.cpp all serve the OpenAI chat endpoint, so any of them
+works as `local`:
+
+```sh
+ollama pull llama3.1
+uv run python -m llm "Reply with the single word: reachable."
+```
+
 ## Layout
 
 | Path         | Contents                                              |
