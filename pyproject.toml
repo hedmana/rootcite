@@ -12,6 +12,8 @@ dependencies = [
     "pyarrow>=25.0.1",
     "pydantic>=2.13.5",
     "pyyaml>=6.0",
+    "torch>=2.14.0",
+    "torch-geometric>=2.8.0.post1",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +28,16 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.9",
 ]
+
+# Linux wheels on PyPI carry a bundled CUDA runtime; this project only ever runs
+# the model on CPU, and the CUDA payload is most of a gigabyte of CI cache.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]
