@@ -64,7 +64,7 @@ Pointing the tool at a different literature means writing a second file in
 | Path         | Contents                                              |
 | ------------ | ----------------------------------------------------- |
 | `fields/`    | Field configs. The only field-specific code in the repo. |
-| `src/graph/` | OpenAlex client, crawler, graph construction          |
+| `src/graph/` | OpenAlex client, crawler, graph construction, baseline scorers |
 | `src/gnn/`   | PyG dataset prep, training, originator scoring        |
 | `src/llm/`   | Provider interface, LangGraph narrative orchestration |
 | `src/api/`   | FastAPI service                                       |
