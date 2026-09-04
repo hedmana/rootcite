@@ -82,7 +82,7 @@ class GraphStats:
     most_cited_within_graph: list[tuple[str, str, int]] = field(default_factory=list)
 
 
-def _missing(value: object) -> bool:
+def is_missing(value: object) -> bool:
     """Absent in the pandas sense: None, NaN, or empty. NaN is truthy, so `not x` lies."""
     return value is None or (isinstance(value, float) and pd.isna(value)) or value == ""
 
@@ -159,7 +159,7 @@ def summarize(graph: nx.DiGraph, top: int = 10) -> GraphStats:
     in_degrees = dict(graph.in_degree())
     out_degrees = dict(graph.out_degree())
     components = list(nx.weakly_connected_components(graph))
-    years = [year for _, year in graph.nodes(data="publication_year") if not _missing(year)]
+    years = [year for _, year in graph.nodes(data="publication_year") if not is_missing(year)]
     node_count = graph.number_of_nodes() or 1
 
     ranked = sorted(in_degrees.items(), key=lambda item: item[1], reverse=True)[:top]
@@ -177,10 +177,14 @@ def summarize(graph: nx.DiGraph, top: int = 10) -> GraphStats:
         year_max=int(max(years)) if years else None,
         nodes_missing_year=graph.number_of_nodes() - len(years),
         nodes_missing_abstract=sum(
-            1 for _, abstract in graph.nodes(data="abstract") if _missing(abstract)
+            1 for _, abstract in graph.nodes(data="abstract") if is_missing(abstract)
         ),
         most_cited_within_graph=[
-            (node, "" if _missing(title := graph.nodes[node].get("title")) else str(title), degree)
+            (
+                node,
+                "" if is_missing(title := graph.nodes[node].get("title")) else str(title),
+                degree,
+            )
             for node, degree in ranked
         ],
     )
