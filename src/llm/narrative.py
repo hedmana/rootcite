@@ -33,6 +33,7 @@ from llm.base import Provider
 logger = logging.getLogger(__name__)
 
 SOURCE_END = "</source>"
+_ATTRIBUTE_UNSAFE = str.maketrans({'"': "'", "<": "", ">": "", "\n": " ", "\r": " "})
 
 SYSTEM = (
     "You explain which earlier papers made a later paper possible, for a reader "
@@ -55,6 +56,12 @@ class Narrative(BaseModel):
     claims: list[Claim]
 
 
+def _attribute(value: str) -> str:
+    """A title comes from the same third-party record as the abstract, so it cannot
+    be allowed to close the tag it labels."""
+    return value.translate(_ATTRIBUTE_UNSAFE)
+
+
 @dataclass(frozen=True)
 class Source:
     work_id: str
@@ -66,7 +73,8 @@ class Source:
         """Delimited so the model can tell where someone else's text begins and ends."""
         body = self.abstract.replace(SOURCE_END, "")
         return (
-            f'<source id="{self.work_id}" year="{self.year}" title="{self.title}">\n'
+            f'<source id="{_attribute(self.work_id)}" year="{_attribute(self.year)}" '
+            f'title="{_attribute(self.title)}">\n'
             f"{body}\n{SOURCE_END}"
         )
 
