@@ -75,6 +75,24 @@ The last command is what the rest is for: the ancestors that carried the paper,
 why, and cited to the abstracts it read. `python -m gnn.originators` prints the
 same ranking without the prose, next to the unlearned baselines it has to beat.
 
+## Serving it
+
+The same two answers over HTTP, for a client that cannot run a snapshot itself.
+
+```sh
+uv run python -m api                            # 127.0.0.1:8000, docs at /docs
+curl localhost:8000/lineage/gnn/W2519887557     # the ranking, no model involved
+curl -X POST localhost:8000/narrative/gnn/W2519887557
+```
+
+Ranking is an encode pass the service pays for once per field and then reuses.
+Narrating is model calls, so it is a separate route and a POST: a client can ask
+what the lineage is without buying an account of why.
+
+Nothing here authenticates. It binds loopback unless `--host` says otherwise,
+and browser access is an explicit allowlist, `ROOTCITE_API_ORIGINS`, defaulting
+to the Vite dev server alone.
+
 ## Model backends
 
 The narrative layer talks to one interface with three backends behind it. Which
@@ -116,26 +134,26 @@ uv run python -m llm "Reply with the single word: reachable."
 ## Roadmap
 
 **Phase 0 — scaffolding**
-- [ ] PR 1 — Repo init: skeleton, license, field config contract
-- [ ] PR 2 — Dev environment: packaging, lint, CI, compose stub
+- [x] PR 1 — Repo init: skeleton, license, field config contract
+- [x] PR 2 — Dev environment: packaging, lint, CI, compose stub
 
 **Phase 1 — data pipeline**
-- [ ] PR 3 — OpenAlex API client
-- [ ] PR 4 — Snowball citation graph crawler
-- [ ] PR 5 — Graph construction and cleaning
+- [x] PR 3 — OpenAlex API client
+- [x] PR 4 — Snowball citation graph crawler
+- [x] PR 5 — Graph construction and cleaning
 
 **Phase 2 — GNN model**
-- [ ] PR 6 — PyG dataset prep with temporal link-prediction split
-- [ ] PR 7 — GNN training pipeline
-- [ ] PR 8 — Originator scoring
+- [x] PR 6 — PyG dataset prep with temporal link-prediction split
+- [x] PR 7 — GNN training pipeline
+- [x] PR 8 — Originator scoring
 
 **Phase 3 — narrative layer**
-- [ ] PR 9 — Swappable LLM provider interface
-- [ ] PR 10 — LangGraph orchestration
-- [ ] PR 11 — Narrative quality pass
+- [x] PR 9 — Swappable LLM provider interface
+- [x] PR 10 — LangGraph orchestration
+- [x] PR 11 — Narrative quality pass
 
 **Phase 4 — API and frontend**
-- [ ] PR 12 — FastAPI backend
+- [x] PR 12 — FastAPI backend
 - [ ] PR 13 — Minimal frontend
 - [ ] PR 14 — Interactive graph viz
 
