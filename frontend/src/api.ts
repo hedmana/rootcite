@@ -11,10 +11,17 @@ export interface Originator extends Work {
   score: number;
 }
 
+export interface Link {
+  citing: string;
+  cited: string;
+  direct: boolean;
+}
+
 export interface Lineage {
   field: string;
   target: Work;
   originators: Originator[];
+  links: Link[];
   baselines: Record<string, number>;
 }
 
