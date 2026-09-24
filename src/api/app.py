@@ -27,11 +27,11 @@ import networkx as nx
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.schemas import Account, FieldSummary, Lineage, Originator, account, work
+from api.schemas import Account, FieldSummary, Lineage, Link, Originator, account, work
 from api.state import Field, Library
 from gnn.originators import learned_flow
 from graph.config import load_field
-from graph.score import SCORERS, overlap, rank
+from graph.score import SCORERS, acyclic, ancestry, overlap, rank, skeleton
 from llm import load_provider
 from llm.base import Provider, ProviderError
 from llm.narrative import tell
@@ -127,12 +127,17 @@ def create_app(
         graph = loaded.graph
         _present(graph, work_id)
         learned = learned_flow(graph, work_id, loaded.model, embedding=loaded.embedding)
+        ranked = rank(learned, top)
+        shown = [work_id, *(node for node, _ in ranked)]
         return Lineage(
             field=loaded.config.name,
             target=work(graph, work_id),
             originators=[
-                Originator(**work(graph, node).model_dump(), score=score)
-                for node, score in rank(learned, top)
+                Originator(**work(graph, node).model_dump(), score=score) for node, score in ranked
+            ],
+            links=[
+                Link(citing=citing, cited=cited, direct=direct)
+                for citing, cited, direct in skeleton(acyclic(ancestry(graph, work_id)), shown)
             ],
             baselines={
                 name: overlap(learned, scorer(graph, work_id), top)

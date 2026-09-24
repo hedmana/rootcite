@@ -24,10 +24,19 @@ class Originator(Work):
     score: float
 
 
+class Link(BaseModel):
+    citing: str
+    cited: str
+    direct: bool = Field(description="cites it outright, rather than through works not shown")
+
+
 class Lineage(BaseModel):
     field: str
     target: Work
     originators: list[Originator]
+    links: list[Link] = Field(
+        description="who leads to whom among the target and its originators, transitively reduced"
+    )
     baselines: dict[str, float] = Field(
         description="share of this ranking's top-k that each unlearned baseline also picked"
     )

@@ -146,6 +146,15 @@ def test_lineage_ranks_the_ancestors_and_names_them(fields_dir):
     }
 
 
+def test_lineage_says_who_leads_to_whom(fields_dir):
+    api, _ = client(fields_dir)
+
+    links = api.get("/lineage/gnn/W1?top=1").json()["links"]
+
+    # W3 is ranked off the page, so nothing leads to it.
+    assert links == [{"citing": "W1", "cited": "W2", "direct": True}]
+
+
 def test_the_snapshot_is_built_once_and_reused(fields_dir):
     api, shelf = client(fields_dir)
 
