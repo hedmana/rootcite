@@ -12,7 +12,7 @@ from typing import Any
 
 import anthropic
 
-from llm.base import Completion, Provider, ProviderConfig, RefusalError
+from llm.base import Completion, Provider, ProviderConfig, ProviderError, RefusalError
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
@@ -35,16 +35,19 @@ class ClaudeProvider(Provider):
         )
 
     def _message(self, prompt: str, system: str | None, **extra: Any) -> Completion:
-        response = self.client.beta.messages.create(
-            model=self.config.model,
-            max_tokens=self.config.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-            thinking={"type": "adaptive"},
-            betas=[FALLBACK_BETA],
-            fallbacks="default",
-            **({"system": system} if system else {}),
-            **extra,
-        )
+        try:
+            response = self.client.beta.messages.create(
+                model=self.config.model,
+                max_tokens=self.config.max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+                thinking={"type": "adaptive"},
+                betas=[FALLBACK_BETA],
+                fallbacks="default",
+                **({"system": system} if system else {}),
+                **extra,
+            )
+        except anthropic.AnthropicError as failure:
+            raise ProviderError(f"{self.name} / {self.config.model}: {failure}") from failure
         if response.stop_reason == "refusal":
             raise RefusalError(f"{self.config.model} declined to answer")
         return Completion(

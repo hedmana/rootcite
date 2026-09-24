@@ -1,11 +1,14 @@
 import json
 from types import SimpleNamespace
 
+import anthropic
+import httpx
+import openai
 import pytest
 from pydantic import BaseModel, ValidationError
 
 from llm import ClaudeProvider, LocalProvider, OpenAIProvider, load_provider
-from llm.base import ProviderConfig, RefusalError, checked_base_url, strict_schema
+from llm.base import ProviderConfig, ProviderError, RefusalError, checked_base_url, strict_schema
 
 ENVIRONMENT = (
     "ROOTCITE_LLM_PROVIDER",
@@ -132,6 +135,38 @@ def test_a_refusal_is_raised_rather_than_returned_as_an_answer():
 
     with pytest.raises(RefusalError):
         provider.complete("something declined")
+
+
+class Unreachable:
+    """A backend whose SDK raises before any answer arrives."""
+
+    def __init__(self, failure):
+        def fail(**kwargs):
+            raise failure
+
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=fail))
+        self.beta = SimpleNamespace(messages=SimpleNamespace(create=fail))
+
+
+REQUEST = httpx.Request("POST", "http://localhost:11434/v1/chat/completions")
+
+
+@pytest.mark.parametrize(
+    ("backend", "failure"),
+    [
+        (ClaudeProvider, anthropic.APIConnectionError(request=REQUEST)),
+        (OpenAIProvider, openai.APIConnectionError(request=REQUEST)),
+        (LocalProvider, openai.APIConnectionError(request=REQUEST)),
+    ],
+)
+def test_an_sdk_failure_surfaces_as_a_provider_error(backend, failure):
+    # Anything else escapes the API's 502 handler as a bare 500.
+    provider = backend(ProviderConfig(model="some-model"), Unreachable(failure))
+
+    with pytest.raises(ProviderError) as raised:
+        provider.complete("a question")
+
+    assert raised.value.__cause__ is failure
 
 
 def test_a_system_prompt_is_sent_only_when_there_is_one():

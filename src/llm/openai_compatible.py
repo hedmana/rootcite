@@ -15,7 +15,7 @@ from typing import Any
 
 import openai
 
-from llm.base import Completion, Provider, ProviderConfig, as_json_instruction
+from llm.base import Completion, Provider, ProviderConfig, ProviderError, as_json_instruction
 
 UNCHECKED_KEY = "not-checked-locally"
 
@@ -50,12 +50,15 @@ class OpenAIProvider(Provider):
         messages = [{"role": "system", "content": system}] if system else []
         messages.append({"role": "user", "content": prompt})
 
-        response = self.client.chat.completions.create(
-            model=self.config.model,
-            messages=messages,
-            **{self.token_parameter: self.config.max_tokens},
-            **extra,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.config.model,
+                messages=messages,
+                **{self.token_parameter: self.config.max_tokens},
+                **extra,
+            )
+        except openai.OpenAIError as failure:
+            raise ProviderError(f"{self.name} / {self.config.model}: {failure}") from failure
         usage = getattr(response, "usage", None)
         return Completion(
             text=response.choices[0].message.content or "",
