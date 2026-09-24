@@ -9,6 +9,7 @@ import {
   fetchLineage,
   requestNarrative,
 } from "./api";
+import GraphView from "./GraphView";
 
 type Request<T> =
   | { status: "idle" }
@@ -56,6 +57,8 @@ function Failure({ request }: { request: Request<unknown> }) {
 }
 
 function LineageView({ lineage }: { lineage: Lineage }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const select = (workId: string) => setSelected((current) => (current === workId ? null : workId));
   return (
     <section>
       <h2>
@@ -65,29 +68,36 @@ function LineageView({ lineage }: { lineage: Lineage }) {
       {lineage.originators.length === 0 ? (
         <p>This paper has no ancestors in the field's snapshot.</p>
       ) : (
-        <div className="scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Work</th>
-                <th className="number">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineage.originators.map((originator, index) => (
-                <tr key={originator.work_id}>
-                  <td>{index + 1}</td>
-                  <td>
-                    <WorkLink work={originator} />
-                    <div className="muted">{byline(originator)}</div>
-                  </td>
-                  <td className="number">{originator.score.toFixed(3)}</td>
+        <>
+          <GraphView lineage={lineage} selected={selected} onSelect={select} />
+          <div className="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Work</th>
+                  <th className="number">Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {lineage.originators.map((originator, index) => (
+                  <tr
+                    key={originator.work_id}
+                    className={originator.work_id === selected ? "selected" : undefined}
+                    onClick={() => select(originator.work_id)}
+                  >
+                    <td>{index + 1}</td>
+                    <td>
+                      <WorkLink work={originator} />
+                      <div className="muted">{byline(originator)}</div>
+                    </td>
+                    <td className="number">{originator.score.toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       <h3>Baseline overlap</h3>
       <p className="muted">Share of this top-k that each unlearned baseline also picked.</p>
@@ -211,7 +221,7 @@ export default function App() {
       <Failure request={lineage} />
       {asked && (
         <>
-          <LineageView lineage={asked} />
+          <LineageView key={`${asked.field}/${asked.target.work_id}`} lineage={asked} />
           {asked.originators.length > 0 && (
             <button
               onClick={() => narrate(() => requestNarrative(asked.field, asked.target.work_id))}
