@@ -11,6 +11,7 @@ from graph.score import (
     overlap,
     path_weight,
     rank,
+    skeleton,
     time_decayed_pagerank,
 )
 
@@ -112,6 +113,26 @@ def test_overlap_is_total_agreement_and_none_at_the_extremes():
     assert overlap(scores, scores, top=2) == 1.0
     assert overlap(scores, {"X": 3.0, "Y": 2.0}, top=2) == 0.0
     assert overlap(scores, {}, top=2) == 0.0
+
+
+def test_skeleton_links_what_the_ranking_leaves_out_and_flags_it_indirect():
+    # G is shown, A and B are not, so T reaches G only through works off the page.
+    links = skeleton(graph_from(BOTTLENECK), ["T", "G", "X"])
+
+    assert sorted(links) == [("G", "X", True), ("T", "G", False)]
+
+
+def test_skeleton_drops_an_edge_two_others_imply():
+    # T cites G outright, but also reaches it through A, which is shown.
+    graph = graph_from([*BOTTLENECK, ("T", "G")])
+
+    links = skeleton(graph, ["T", "A", "G"])
+
+    assert sorted(links) == [("A", "G", True), ("T", "A", True)]
+
+
+def test_skeleton_leaves_unrelated_works_unlinked():
+    assert skeleton(graph_from(BOTTLENECK), ["X", "Y"]) == []
 
 
 def test_compare_scores_every_baseline_on_one_lineage():

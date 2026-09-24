@@ -132,3 +132,76 @@ td {
   padding: 0;
   list-style: none;
 }
+
+.graph {
+  margin: 1rem 0 1.5rem;
+}
+
+.graph svg {
+  display: block;
+  font-size: 11px;
+}
+
+.tick line {
+  stroke: var(--line);
+}
+
+.tick text {
+  fill: var(--muted);
+  text-anchor: middle;
+}
+
+.link {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.25;
+  transition: opacity 0.15s;
+}
+
+.link.indirect {
+  stroke-dasharray: 4 3;
+}
+
+.arrowhead {
+  fill: var(--muted);
+}
+
+.node {
+  cursor: pointer;
+  outline: none;
+  transition: opacity 0.15s;
+}
+
+.node circle {
+  fill: var(--accent);
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+
+.node.target circle {
+  fill: var(--fg);
+}
+
+.node.selected circle,
+.node:focus-visible circle {
+  stroke: var(--fg);
+  stroke-width: 2.5;
+}
+
+.node .rank {
+  fill: var(--muted);
+  text-anchor: end;
+  dominant-baseline: central;
+}
+
+.dim {
+  opacity: 0.15;
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+tr.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}

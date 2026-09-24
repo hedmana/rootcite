@@ -101,9 +101,10 @@ cd frontend && npm ci && npm run dev            # in another; localhost:5173
 ```
 
 Pick a field with a snapshot, give it an OpenAlex work id, and it ranks the
-originators. Narrating is a separate button because it spends model calls. The
-client needs Node 20.19 or later and finds the API at `VITE_API_URL`,
-defaulting to `http://127.0.0.1:8000`.
+originators, drawn as a graph with older works to the left: hover or select one
+to see the paths from the paper to it. Narrating is a separate button because
+it spends model calls. The client needs Node 20.19 or later and finds the API
+at `VITE_API_URL`, defaulting to `http://127.0.0.1:8000`.
 
 ## Model backends
 
@@ -167,7 +168,7 @@ uv run python -m llm "Reply with the single word: reachable."
 **Phase 4 — API and frontend**
 - [x] PR 12 — FastAPI backend
 - [x] PR 13 — Minimal frontend
-- [ ] PR 14 — Interactive graph viz
+- [x] PR 14 — Interactive graph viz
 
 **Phase 5 — polish**
 - [ ] PR 15 — Docker Compose full stack
