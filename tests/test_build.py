@@ -176,6 +176,9 @@ def test_snapshot_round_trips_through_disk(tmp_path):
 
     assert graph.has_edge("A", "B")
     assert graph.nodes["B"]["title"] == "Paper B"
+    # A list, not the array parquet reads back, which raises under `or []`.
+    authors = graph.nodes["B"]["authors"]
+    assert isinstance(authors, list) and authors == ["Ada Lovelace"]
     assert (path / "stats.json").exists()
 
 

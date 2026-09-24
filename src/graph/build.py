@@ -16,6 +16,7 @@ from datetime import date
 from pathlib import Path
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 
 from graph.config import DateRange, FieldConfig, load_field
@@ -144,12 +145,17 @@ def _largest_component(node_ids: pd.Series, edges: pd.DataFrame) -> set[str]:
     return max(nx.connected_components(scaffold), key=len)
 
 
+def _plain(value: object) -> object:
+    """Parquet hands list columns back as arrays, which have no truth value."""
+    return value.tolist() if isinstance(value, np.ndarray) else value
+
+
 def to_graph(nodes: pd.DataFrame, edges: pd.DataFrame) -> nx.DiGraph:
     """Assemble a directed graph whose edges point from citing to cited work."""
     graph = nx.DiGraph()
     attributes = [column for column in NODE_ATTRIBUTES if column in nodes.columns]
     for row in nodes.itertuples(index=False):
-        graph.add_node(row.id, **{name: getattr(row, name) for name in attributes})
+        graph.add_node(row.id, **{name: _plain(getattr(row, name)) for name in attributes})
     graph.add_edges_from(edges[["source", "target"]].itertuples(index=False, name=None))
     return graph
 
