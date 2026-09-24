@@ -61,6 +61,29 @@ def acyclic(graph: nx.DiGraph) -> nx.DiGraph:
         graph.remove_edge(*min(cycle, key=lambda edge: year_gap(graph, *edge[:2]))[:2])
 
 
+def skeleton(lineage: nx.DiGraph, shown: list[str]) -> list[tuple[str, str, bool]]:
+    """Which of `shown` leads to which, as (citing, cited, cites it outright).
+
+    A ranking's members rarely cite each other directly: the paths between them
+    run through works outside it. So an edge stands for reachability in the
+    acyclic `lineage`, and any edge two others already imply is left out. Each
+    node's reach is a bitmask over `shown`, settled in one pass from the oldest
+    works up rather than by a traversal per shown node.
+    """
+    bit = {node: 1 << order for order, node in enumerate(shown)}
+    below: dict[str, int] = {}
+    for node in reversed(list(nx.topological_sort(lineage))):
+        mask = 0
+        for cited in lineage.successors(node):
+            mask |= below[cited] | bit.get(cited, 0)
+        below[node] = mask
+
+    reach = nx.DiGraph()
+    reach.add_nodes_from(shown)
+    reach.add_edges_from((a, b) for a in shown for b in shown if below[a] & bit[b])
+    return [(a, b, lineage.has_edge(a, b)) for a, b in nx.transitive_reduction(reach).edges]
+
+
 def in_degree(graph: nx.DiGraph, target: str) -> Scores:
     """How often the lineage cites a work. The control: local popularity."""
     subgraph = ancestry(graph, target)
