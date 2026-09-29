@@ -62,6 +62,16 @@ def test_edges_past_the_crawl_horizon_are_dropped():
     assert list(edges["target"]) == ["B"]
 
 
+def test_excluded_works_are_dropped_with_their_edges():
+    nodes, edges = frames([node("A"), node("B"), node("C")], [("A", "B"), ("A", "C")])
+
+    nodes, edges, report = clean(nodes, edges, exclude=["B"])
+
+    assert report.excluded_nodes == 1
+    assert sorted(nodes["id"]) == ["A", "C"]
+    assert list(edges.itertuples(index=False, name=None)) == [("A", "C")]
+
+
 def test_nodes_outside_the_date_range_are_dropped_with_their_edges():
     nodes, edges = frames(
         [node("A", year=2015), node("B", year=1970), node("C", year=2016)],

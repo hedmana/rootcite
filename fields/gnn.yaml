@@ -31,6 +31,12 @@ seed_papers:
   - W2624431344  # Inductive Representation Learning on Large Graphs (2017)
   - W2766453196  # Graph Attention Networks (2017)
 
+# Works dropped at cleaning: OpenAlex records whose metadata is wrong in a way
+# the pipeline cannot detect, so they would surface in rankings under a name
+# that is not theirs.
+exclude_works:
+  - W2964015378  # cited 2347 times inside the graph, titled as a 2025 vulnerability-detection paper
+
 crawl:
   # How many citation hops to expand outward from the seeds.
   hop_depth: 2
