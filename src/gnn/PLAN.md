@@ -57,18 +57,19 @@ One PR each, named for what it does.
 
   | Scorer | dev found | dev Recall@10 / nDCG@10 | test found | test Recall@10 / nDCG@10 |
   |---|---|---|---|---|
-  | learned (model and content, served) | 24/32 | 0.931 / 0.756 | 17/31 | 0.626 / 0.561 |
-  | model only | 22/32 | 0.806 / 0.650 | 16/31 | 0.523 / 0.340 |
-  | equal-weight walk | 22/32 | 0.806 / 0.571 | 14/31 | 0.474 / 0.344 |
-  | time_decayed_pagerank | 21/32 | 0.778 / 0.567 | 14/31 | 0.474 / 0.303 |
-  | gateway | 5/32 | 0.106 / 0.090 | 4/31 | 0.167 / 0.080 |
-  | in_degree | 2/32 | 0.097 / 0.092 | 2/31 | 0.076 / 0.038 |
+  | learned (model and content, served) | 23/32 | 0.837 / 0.695 | 17/31 | 0.614 / 0.542 |
+  | model only | 24/32 | 0.806 / 0.594 | 17/31 | 0.553 / 0.344 |
+  | equal-weight walk | 21/32 | 0.754 / 0.514 | 12/31 | 0.402 / 0.308 |
+  | time_decayed_pagerank | 22/32 | 0.766 / 0.536 | 13/31 | 0.447 / 0.289 |
+  | gateway | 4/32 | 0.079 / 0.070 | 3/31 | 0.121 / 0.096 |
+  | in_degree | 3/32 | 0.181 / 0.175 | 3/31 | 0.121 / 0.109 |
   | path_weight | 0/32 | 0 / 0 | 0/31 | 0 / 0 |
 
-  With ChebNet's title corrected (its OpenAlex record carried a lecture's title and abstract, which content weighting read as off-topic). Learned top-10 overlap across seeds 0.93 dev, 0.97 test; with 10% of citations dropped 0.93 on both. Tried on dev and left out: walk damping, age half-life and sharpening the model's weights (a hit either way, noise at 12 papers), and Semantic Scholar's influence rate per work (Adam's is higher than ChebNet's). `path_weight` ranks 1980s foundations first, the failure time decay exists to prevent.
+  On the filled-in graph, with ChebNet's title corrected (its OpenAlex record carried a lecture's title and abstract, which content weighting read as off-topic). Before the fill the learned ranking found 24/32 dev and 17/31 test, nDCG 0.756 and 0.561. Learned top-10 overlap across seeds 0.98 on both; with 10% of citations dropped 0.92 dev, 0.86 test. Tried on dev and left out: walk damping, age half-life and sharpening the model's weights (a hit either way, noise at 12 papers), and Semantic Scholar's influence rate per work (Adam's is higher than ChebNet's). `path_weight` ranks 1980s foundations first, the failure time decay exists to prevent.
 - [x] **Recovered citations.** `graph.semanticscholar`, an optional stage between crawl and build: 6811 MAG-era works' Semantic Scholar references matched back to crawled works by MAG id, else by title and year. 22582 citations matched, 6808 of them lost from OpenAlex; GCN regains Bruna, Henaff and Weston. Served.
 - [x] **Citation influence labels.** 5202 Semantic Scholar `isInfluential` labels from 141 non-gold papers. The decoder's plausibility alone predicts them at AUC 0.70, hand features at 0.71, and the model's embeddings add nothing. The flag mostly counts how often a paper mentions a work, so tools earn it too.
 - [x] **Influence-aligned objective.** Not adopted. Walk weights from a model of those labels tie content weighting on dev (24 against 23 of 32 found) and add nothing on top of it, for an extra pipeline stage and a rate-limited API at ranking time.
+- [x] **Fill-in of cross-field works.** `crawl.fill_cited_by: 20` fetches, without following, the uncrawled works 20 or more crawled works cite: 1282 candidates, 827 alive, 10332 works in the raw crawl. Recovered citations rise from 6808 to 10344. Gold originators reachable: dev 28/32 to 31/32, test 30/31 to 31/31: Bahdanau, Interaction Networks, Kearnes and DistMult. Found stays 17/31 on test and drops one on dev. The fill also brings in heavily cited datasets and baselines (Planetoid, QM9, TransE, RESCAL), which compete for the same places; telling "built on" from "compared against" needs how a paper cites a work, not whether it does.
 - [x] **Crawl expansion.** Uncapped backward crawl, plus `forward_depth: 1`: the in-topic works citing the seeds. 2789 works and 15k citations became 9249 and 104k. GAT is seeded by its primary record. Cleaning re-dates 262 works OpenAlex dates years after their citers, and a year heavier than its split's share no longer empties the split after it. Gold originators reachable from their targets: 88/94 to 90/94. The other four are references OpenAlex holds under dead ids (about 12% of all references), among them GCN's to Bruna, Henaff and Planetoid.
 
 Optional: blinded LLM pairwise judge, trusted only after it agrees with the gold set.
