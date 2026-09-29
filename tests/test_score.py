@@ -49,6 +49,15 @@ def test_acyclic_drops_the_edge_that_disagrees_with_publication_order():
     assert list(broken.edges()) == [("A", "B")]
 
 
+def test_acyclic_takes_the_work_its_same_year_peers_cite_most_as_the_earliest():
+    graph = graph_from([("A", "B"), ("B", "C"), ("C", "A"), ("A", "C")])
+
+    broken = acyclic(graph)
+
+    assert nx.is_directed_acyclic_graph(broken)
+    assert sorted(broken.edges()) == [("A", "B"), ("A", "C"), ("B", "C")]
+
+
 def test_acyclic_leaves_a_dag_alone():
     graph = graph_from(BOTTLENECK)
 

@@ -45,20 +45,31 @@ def year_gap(graph: nx.DiGraph, source: str, target: str) -> float:
 def acyclic(graph: nx.DiGraph) -> nx.DiGraph:
     """Break cycles, which arrive via preprints revised after being cited.
 
-    The edge dropped from each cycle is the one that most disagrees with
-    publication order, so the surviving graph is the chronologically coherent
-    reading of the citations.
+    Inside each tangle of mutual citations, works are laid out newest first and
+    only citations running forward in that order survive, so a citation of a
+    later work, the one that most disagrees with publication order, goes first.
+    Between works of one year, the one its peers cite more is taken as the
+    earlier. One pass per tangle rather than one per cycle: on a dense graph,
+    milliseconds rather than seconds.
     """
     if nx.is_directed_acyclic_graph(graph):
         return graph
 
     graph = nx.DiGraph(graph)
-    while True:
-        try:
-            cycle = nx.find_cycle(graph)
-        except nx.NetworkXNoCycle:
-            return graph
-        graph.remove_edge(*min(cycle, key=lambda edge: year_gap(graph, *edge[:2]))[:2])
+    for tangle in list(nx.strongly_connected_components(graph)):
+        if len(tangle) < 2:
+            continue
+        inner = graph.subgraph(tangle)
+        laid_out = sorted((-_year(graph, node), inner.in_degree(node), node) for node in tangle)
+        position = {node: order for order, (*_, node) in enumerate(laid_out)}
+        graph.remove_edges_from([(a, b) for a, b in inner.edges if position[a] > position[b]])
+    return graph
+
+
+def _year(graph: nx.DiGraph, node: str) -> float:
+    """Publication year, with an undated work placed before everything dated."""
+    year = graph.nodes[node].get("publication_year")
+    return 0.0 if is_missing(year) else float(year)
 
 
 def skeleton(lineage: nx.DiGraph, shown: list[str]) -> list[tuple[str, str, bool]]:
