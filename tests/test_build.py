@@ -6,6 +6,7 @@ import pytest
 
 from graph.build import (
     clean,
+    is_missing,
     latest_snapshot,
     load_snapshot,
     save_snapshot,
@@ -70,6 +71,18 @@ def test_excluded_works_are_dropped_with_their_edges():
     assert report.excluded_nodes == 1
     assert sorted(nodes["id"]) == ["A", "C"]
     assert list(edges.itertuples(index=False, name=None)) == [("A", "C")]
+
+
+def test_a_record_filed_under_another_title_gets_its_own_and_loses_the_abstract():
+    nodes, edges = frames([node("A"), node("B", title="A workshop lecture")], [("A", "B")])
+
+    nodes, _, report = clean(nodes, edges, retitle={"B": "ChebNet"})
+    kept = nodes.set_index("id")
+
+    assert report.retitled_nodes == 1
+    assert kept.loc["B", "title"] == "ChebNet"
+    assert is_missing(kept.loc["B", "abstract"])
+    assert kept.loc["A", "title"] == "Paper A"
 
 
 def test_nodes_outside_the_date_range_are_dropped_with_their_edges():

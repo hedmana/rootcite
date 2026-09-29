@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
@@ -49,6 +49,7 @@ class CleaningReport:
     raw_nodes: int = 0
     raw_edges: int = 0
     excluded_nodes: int = 0
+    retitled_nodes: int = 0
     duplicate_nodes: int = 0
     duplicate_edges: int = 0
     out_of_range_nodes: int = 0
@@ -112,6 +113,7 @@ def clean(
     *,
     date_range: DateRange | None = None,
     exclude: Iterable[str] = (),
+    retitle: Mapping[str, str] | None = None,
     largest_component_only: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, CleaningReport]:
     """Reduce raw crawl tables to a consistent node set and edge set."""
@@ -122,7 +124,14 @@ def clean(
 
     excluded = nodes["id"].isin(set(exclude))
     report.excluded_nodes = int(excluded.sum())
-    nodes = nodes[~excluded]
+    nodes = nodes[~excluded].copy()
+
+    # The abstract came from the same wrong record as the title, so it goes too.
+    wrong = nodes["id"].isin(set(retitle or {}))
+    report.retitled_nodes = int(wrong.sum())
+    nodes.loc[wrong, "title"] = nodes.loc[wrong, "id"].map(retitle or {})
+    if "abstract" in nodes:
+        nodes.loc[wrong, "abstract"] = None
 
     if date_range is not None:
         in_range = nodes["publication_year"].map(date_range.contains)
@@ -279,6 +288,7 @@ def build_field(
         edges,
         date_range=config.crawl.date_range,
         exclude=config.exclude_works,
+        retitle=config.corrected_titles,
         largest_component_only=largest_component_only,
     )
     surviving = set(nodes["id"])

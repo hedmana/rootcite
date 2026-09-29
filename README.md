@@ -52,6 +52,7 @@ description: >
 topic_id: null          # OpenAlex topic delimiting the field
 seed_papers: []         # OpenAlex work IDs the crawl starts from
 exclude_works: []       # records whose metadata OpenAlex got wrong
+corrected_titles: {}    # records filed under another work's title
 crawl:
   hop_depth: 2          # references, backwards from the seeds
   forward_depth: 1      # works citing the seeds, within topic_id
