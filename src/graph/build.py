@@ -24,6 +24,9 @@ from graph.crawler import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+# A preprint can be cited a year before the venue date OpenAlex gives it.
+PREPRINT_SLACK = 1
+
 NODE_ATTRIBUTES = (
     "title",
     "abstract",
@@ -45,6 +48,7 @@ class CleaningReport:
     duplicate_edges: int = 0
     out_of_range_nodes: int = 0
     dangling_edges: int = 0
+    redated_nodes: int = 0
     self_loops: int = 0
     disconnected_nodes: int = 0
     nodes: int = 0
@@ -124,6 +128,7 @@ def clean(
     connected = edges["source"].isin(known) & edges["target"].isin(known)
     report.dangling_edges = int((~connected).sum())
     edges = edges[connected]
+    nodes, report.redated_nodes = _redate(nodes, edges)
 
     if largest_component_only:
         keep = _largest_component(nodes["id"], edges)
@@ -134,6 +139,24 @@ def clean(
     report.nodes = len(nodes)
     report.edges = len(edges)
     return nodes, edges, report
+
+
+def _redate(nodes: pd.DataFrame, edges: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """Pull back any work dated well after the works that cite it.
+
+    OpenAlex sometimes dates a work by a late reprint or a mis-merged record. A
+    work cited in 2017 but dated 2025 turns every citation of it into one of the
+    future, which a temporal split reads as a free label. Such a work takes the
+    year of its earliest citer.
+    """
+    if edges.empty:
+        return nodes, 0
+    year = nodes.set_index("id")["publication_year"]
+    earliest = nodes["id"].map(edges["source"].map(year).groupby(edges["target"]).min())
+    late = nodes["publication_year"] > earliest + PREPRINT_SLACK
+    nodes = nodes.copy()
+    nodes.loc[late, "publication_year"] = earliest[late].astype(nodes["publication_year"].dtype)
+    return nodes, int(late.sum())
 
 
 def _largest_component(node_ids: pd.Series, edges: pd.DataFrame) -> set[str]:

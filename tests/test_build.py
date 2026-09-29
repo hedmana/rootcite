@@ -75,6 +75,27 @@ def test_nodes_outside_the_date_range_are_dropped_with_their_edges():
     assert list(edges.itertuples(index=False, name=None)) == [("A", "C")]
 
 
+def test_a_work_dated_after_its_citers_takes_its_earliest_citers_year():
+    nodes, edges = frames(
+        [node("A", year=2017), node("B", year=2019), node("C", year=2025)],
+        [("A", "C"), ("B", "C")],
+    )
+
+    nodes, _, report = clean(nodes, edges)
+
+    assert report.redated_nodes == 1
+    assert nodes.set_index("id").loc["C", "publication_year"] == 2017
+
+
+def test_a_preprint_cited_a_year_before_its_venue_date_keeps_it():
+    nodes, edges = frames([node("A", year=2016), node("B", year=2017)], [("A", "B")])
+
+    nodes, _, report = clean(nodes, edges)
+
+    assert report.redated_nodes == 0
+    assert nodes.set_index("id").loc["B", "publication_year"] == 2017
+
+
 def test_only_the_largest_component_survives_by_default():
     nodes, edges = frames(
         [node("A"), node("B"), node("C"), node("X"), node("Y")],
