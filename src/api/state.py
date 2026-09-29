@@ -20,6 +20,7 @@ from pathlib import Path
 import networkx as nx
 from torch import Tensor
 
+from gnn.content import Content
 from gnn.model import LinkPredictor
 from gnn.originators import embed
 from gnn.train import load_model
@@ -38,6 +39,7 @@ class Field:
     graph: nx.DiGraph
     model: LinkPredictor
     embedding: tuple[dict[str, int], Tensor]
+    content: Content
 
 
 class Library:
@@ -77,4 +79,6 @@ class Library:
         logger.info("loading field %s from %s", name, snapshot)
         graph = load_snapshot(snapshot)
         model = load_model(snapshot)
-        return Field(load_field(name, self.fields_dir), graph, model, embed(graph, model))
+        return Field(
+            load_field(name, self.fields_dir), graph, model, embed(graph, model), Content(graph)
+        )

@@ -32,6 +32,7 @@ import yaml
 from pydantic import BaseModel
 from torch import Tensor
 
+from gnn.content import Content
 from gnn.dataset import build_dataset
 from gnn.model import LinkPredictor
 from gnn.originators import embed, flow, learned_flow
@@ -69,11 +70,13 @@ def rankings(
     target: str,
     model: LinkPredictor,
     embedding: tuple[dict[str, int], Tensor],
+    content: Content,
     top: int,
 ) -> dict[str, list[str]]:
-    """Every scorer's top works for one paper: the model, its walk unweighted, the baselines."""
+    """Every scorer's top works for one paper: as served, without content, unweighted, baselines."""
     scores = {
-        "learned": learned_flow(graph, target, model, embedding=embedding),
+        "learned": learned_flow(graph, target, model, embedding=embedding, content=content),
+        "model_only": learned_flow(graph, target, model, embedding=embedding),
         "uniform_flow": flow(acyclic(ancestry(graph, target)), target),
         **{name: scorer(graph, target) for name, scorer in SCORERS.items()},
     }
@@ -129,6 +132,7 @@ def assess(
             logger.warning("gold target %s is not in the graph", lineage.target)
 
     embedding = embed(graph, model)
+    content = Content(graph)
     thinned = _thinned(graph, dropout, seed=0)
     thinned_embedding = embed(thinned, model)
     others = [
@@ -141,10 +145,15 @@ def assess(
     for lineage in lineages:
         reachable = set(ancestry(graph, lineage.target))
         findable = [ids for ids in lineage.originators if reachable.intersection(ids)]
-        ranked = rankings(graph, lineage.target, model, embedding, top)
-        stressed = rankings(thinned, lineage.target, model, thinned_embedding, top)
+        ranked = rankings(graph, lineage.target, model, embedding, content, top)
+        stressed = rankings(thinned, lineage.target, model, thinned_embedding, content, top)
         learned = [ranked["learned"]] + [
-            [node for node, _ in rank(learned_flow(graph, lineage.target, other, embedding=e), top)]
+            [
+                node
+                for node, _ in rank(
+                    learned_flow(graph, lineage.target, other, embedding=e, content=content), top
+                )
+            ]
             for other, e in zip(others, other_embeddings, strict=True)
         ]
         title = graph.nodes[lineage.target].get("title")

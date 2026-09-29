@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from api.state import Field, Library
+from gnn.content import Content
 from graph.config import load_field
 from llm.base import ProviderError
 from llm.narrative import Claim, Judgement, Narrative, Verdict
@@ -73,6 +74,7 @@ class Shelf(Library):
             self.graph,
             Indifferent(),
             (position, torch.zeros(len(position), 2)),
+            Content(self.graph),
         )
 
 

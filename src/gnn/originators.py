@@ -6,6 +6,10 @@ the survey summarised. This scorer replaces that flat weighting with the trained
 decoder: at each step backwards the walk prefers the citations the model finds
 most plausible, which is the one thing structure alone cannot tell it.
 
+A plausible citation can still be an incidental one: every paper cites its
+optimiser. So each step also follows how much the two works share in subject,
+from their titles and abstracts, which is what tells a precursor from a tool.
+
 The walk is then decayed by age. Backwards through a citation graph there is
 always another ancestor, and without decay the ranking ends at the founding of
 the discipline rather than at the work that made this paper possible.
@@ -22,6 +26,7 @@ import torch
 from torch import Tensor
 from torch_geometric.utils import to_undirected
 
+from gnn.content import Content
 from gnn.dataset import observed_view
 from gnn.model import LinkPredictor
 from gnn.train import load_model
@@ -30,6 +35,11 @@ from graph.crawler import DATA_DIR
 from graph.score import SCORERS, Scores, acyclic, ancestry, overlap, rank, year_gap
 
 logger = logging.getLogger(__name__)
+
+# Square-rooted, so shared subject tempers the model rather than overruling it,
+# and floored, so a work with no abstract on record still gets a share.
+CONTENT_WEIGHT = 0.5
+CONTENT_FLOOR = 0.02
 
 
 def embed(graph: nx.DiGraph, model: LinkPredictor) -> tuple[dict[str, int], Tensor]:
@@ -63,16 +73,20 @@ def learned_flow(
     damping: float = 0.85,
     half_life: float = 10.0,
     embedding: tuple[dict[str, int], Tensor] | None = None,
+    content: Content | None = None,
 ) -> Scores:
-    """Weight of a damped walk backwards from `target`, steered by the model."""
+    """Weight of a damped walk backwards from `target`, steered by the model and by content."""
     lineage = acyclic(ancestry(graph, target))
     position, z = embedding or embed(graph, model)
 
     edges = list(lineage.edges())
-    plausibility = dict(
-        zip(edges, citation_probability(model, z, position, edges).tolist(), strict=True)
-    )
-    return flow(lineage, target, plausibility, damping=damping, half_life=half_life)
+    weight = dict(zip(edges, citation_probability(model, z, position, edges).tolist(), strict=True))
+    if content is not None:
+        weight = {
+            edge: share * (CONTENT_FLOOR + content.similarity(*edge)) ** CONTENT_WEIGHT
+            for edge, share in weight.items()
+        }
+    return flow(lineage, target, weight, damping=damping, half_life=half_life)
 
 
 def flow(
@@ -118,7 +132,7 @@ def score_target(
     graph = load_snapshot(snapshot)
     model = load_model(snapshot)
     return (
-        learned_flow(graph, target, model, half_life=half_life),
+        learned_flow(graph, target, model, half_life=half_life, content=Content(graph)),
         {name: scorer(graph, target) for name, scorer in SCORERS.items()},
     )
 
