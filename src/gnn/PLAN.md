@@ -57,7 +57,7 @@ One PR each, named for what it does.
 
   | Scorer | dev found | dev Recall@10 / nDCG@10 | test found | test Recall@10 / nDCG@10 |
   |---|---|---|---|---|
-  | learned (model and content, served) | 23/32 | 0.903 / 0.717 | 17/31 | 0.626 / 0.556 |
+  | learned (model and content, served) | 24/32 | 0.931 / 0.756 | 17/31 | 0.626 / 0.561 |
   | model only | 22/32 | 0.806 / 0.650 | 16/31 | 0.523 / 0.340 |
   | equal-weight walk | 22/32 | 0.806 / 0.571 | 14/31 | 0.474 / 0.344 |
   | time_decayed_pagerank | 21/32 | 0.778 / 0.567 | 14/31 | 0.474 / 0.303 |
@@ -65,7 +65,7 @@ One PR each, named for what it does.
   | in_degree | 2/32 | 0.097 / 0.092 | 2/31 | 0.076 / 0.038 |
   | path_weight | 0/32 | 0 / 0 | 0/31 | 0 / 0 |
 
-  Learned top-10 overlap across seeds 0.94 dev, 0.97 test; with 10% of citations dropped 0.92 and 0.93. Tried on dev and left out: walk damping, age half-life and sharpening the model's weights (a hit either way, noise at 12 papers), and Semantic Scholar's influence rate per work (Adam's is higher than ChebNet's). `path_weight` ranks 1980s foundations first, the failure time decay exists to prevent.
+  With ChebNet's title corrected (its OpenAlex record carried a lecture's title and abstract, which content weighting read as off-topic). Learned top-10 overlap across seeds 0.93 dev, 0.97 test; with 10% of citations dropped 0.93 on both. Tried on dev and left out: walk damping, age half-life and sharpening the model's weights (a hit either way, noise at 12 papers), and Semantic Scholar's influence rate per work (Adam's is higher than ChebNet's). `path_weight` ranks 1980s foundations first, the failure time decay exists to prevent.
 - [x] **Recovered citations.** `graph.semanticscholar`, an optional stage between crawl and build: 6811 MAG-era works' Semantic Scholar references matched back to crawled works by MAG id, else by title and year. 22582 citations matched, 6808 of them lost from OpenAlex; GCN regains Bruna, Henaff and Weston. Served.
 - [x] **Citation influence labels.** 5202 Semantic Scholar `isInfluential` labels from 141 non-gold papers. The decoder's plausibility alone predicts them at AUC 0.70, hand features at 0.71, and the model's embeddings add nothing. The flag mostly counts how often a paper mentions a work, so tools earn it too.
 - [x] **Influence-aligned objective.** Not adopted. Walk weights from a model of those labels tie content weighting on dev (24 against 23 of 32 found) and add nothing on top of it, for an extra pipeline stage and a rate-limited API at ranking time.
