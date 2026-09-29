@@ -126,7 +126,9 @@ def create_app(
     ) -> Lineage:
         graph = loaded.graph
         _present(graph, work_id)
-        learned = learned_flow(graph, work_id, loaded.model, embedding=loaded.embedding)
+        learned = learned_flow(
+            graph, work_id, loaded.model, embedding=loaded.embedding, content=loaded.content
+        )
         ranked = rank(learned, top)
         shown = [work_id, *(node for node, _ in ranked)]
         return Lineage(
@@ -155,7 +157,9 @@ def create_app(
     ) -> Account:
         graph = loaded.graph
         _present(graph, work_id)
-        scores = learned_flow(graph, work_id, loaded.model, embedding=loaded.embedding)
+        scores = learned_flow(
+            graph, work_id, loaded.model, embedding=loaded.embedding, content=loaded.content
+        )
         if not scores:
             raise HTTPException(404, f"{work_id} has no ancestors in this field's snapshot")
         try:

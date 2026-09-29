@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 import torch
 
+from gnn.content import Content
 from gnn.dataset import build_dataset
 from gnn.originators import embed, learned_flow, score_target
 from gnn.train import TrainConfig, save_model, train
@@ -72,6 +73,21 @@ def test_structural_twins_are_separated_by_the_model_alone():
     scores = learned_flow(graph, "T", FixedOpinion(graph, [("T", "A")]))
 
     assert scores["A"] > scores["B"]
+
+
+def test_structural_twins_are_separated_by_what_they_are_about():
+    """A precursor and a tool the model finds equally plausible: content tells them apart."""
+    graph = lineage(DIAMOND)
+    abstracts = {"T": "graph attention", "A": "attention alignment", "B": "stochastic optimiser"}
+    for node, abstract in abstracts.items():
+        graph.nodes[node]["abstract"] = abstract
+    indifferent = FixedOpinion(graph, graph.edges)
+
+    plain = learned_flow(graph, "T", indifferent)
+    informed = learned_flow(graph, "T", indifferent, content=Content(graph))
+
+    assert plain["A"] == plain["B"]
+    assert informed["A"] > informed["B"]
 
 
 def test_the_distant_past_is_discounted():
