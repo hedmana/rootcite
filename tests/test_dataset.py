@@ -4,11 +4,14 @@ import torch
 
 from gnn.dataset import (
     FEATURE_NAMES,
+    UNDATED,
     build_dataset,
     index_graph,
     load_dataset,
+    publication_order,
     sample_negatives,
     save_dataset,
+    with_degrees,
 )
 
 
@@ -78,6 +81,32 @@ def test_degree_features_come_from_the_training_subgraph_alone():
 
     assert dataset.train.x[newest, out_degree] == 0
     assert dataset.train.x[newest, in_degree] == 0
+
+
+def test_degrees_are_counted_over_the_graph_they_are_given():
+    dataset = build_dataset(cohorts(), val_fraction=0.2, test_fraction=0.2)
+    out_degree = FEATURE_NAMES.index("log_out_degree")
+    source = dataset.val.edge_label_index[0, 0]
+
+    recounted = with_degrees(dataset.test.x, dataset.test.edge_index)
+
+    assert dataset.test.x[source, out_degree] == 0
+    assert recounted[source, out_degree] > 0
+
+
+def test_publication_order_keeps_the_order_and_ties_of_the_years():
+    graph = cohorts()
+    graph.add_node("WU", publication_year=None, authors=[])
+    graph.add_edge("WU", "W0")
+    _, years, _ = index_graph(graph)
+
+    order = publication_order(build_dataset(graph).train.x)
+
+    dated = years != UNDATED
+    assert (order[~dated] == UNDATED).all()
+    known, placed = years[dated], order[dated]
+    assert (known[:, None] < known).equal(placed[:, None] < placed)
+    assert (known[:, None] == known).equal(placed[:, None] == placed)
 
 
 def test_negatives_are_citations_that_could_have_happened_and_did_not():
