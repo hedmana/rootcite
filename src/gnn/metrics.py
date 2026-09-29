@@ -1,8 +1,8 @@
 """Ranking metrics for link prediction.
 
-Both answer the same question a citation ranking asks: are the real citations
-above the imagined ones? Neither needs a threshold, and neither needs a
-dependency beyond torch.
+Each answers the same question a citation ranking asks: are the real citations
+above the imagined ones? None needs a threshold, and none needs a dependency
+beyond torch.
 """
 
 from __future__ import annotations
@@ -35,3 +35,15 @@ def average_precision(scores: Tensor, labels: Tensor) -> float:
     found = positives.cumsum(0)
     precision = found / torch.arange(1, positives.numel() + 1)
     return float(precision[positives].mean())
+
+
+def positive_ranks(positive: Tensor, negative: Tensor, owner: Tensor) -> Tensor:
+    """Where each true citation places among the non-citations drawn for it, 1 being first.
+
+    `owner` names, for every negative, the positive it was drawn against. A tie
+    counts as half a loss, so a scorer that cannot tell the two apart lands
+    mid-table rather than on top.
+    """
+    rival = positive[owner]
+    lost = (negative > rival).float() + (negative == rival).float() / 2
+    return torch.zeros(positive.numel()).scatter_add_(0, owner, lost) + 1
