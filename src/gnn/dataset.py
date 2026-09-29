@@ -136,39 +136,55 @@ def _cut_points(edge_years: Tensor, val_fraction: float, test_fraction: float) -
     return int(ordered[train_end]), int(ordered[val_end])
 
 
-def _negatives(
-    sources: Tensor, years: Tensor, existing: Tensor, count: int, generator: torch.Generator
-) -> Tensor:
+def sample_negatives(
+    positive: Tensor,
+    years: Tensor,
+    existing: Tensor,
+    count: int,
+    generator: torch.Generator,
+    *,
+    year_matched: bool = False,
+) -> tuple[Tensor, Tensor]:
     """Citations each source could plausibly have made and did not.
 
     A negative is only informative if it was possible: the cited work has to
     already exist. Sources are drawn from the split's own positives, so the
-    negatives inherit the era being scored.
+    negatives inherit the era being scored. `year_matched` narrows the draw to
+    works from the positive's cited year, so the gap between citing and cited
+    says nothing about which of the two is real.
+
+    Returns the negatives, and for each the column of `positive` it stands against.
     """
+    sources, cited = positive
     dated = (years != UNDATED).nonzero(as_tuple=True)[0]
     if sources.numel() == 0 or dated.numel() == 0:
-        return torch.empty(2, 0, dtype=torch.long)
+        return torch.empty(2, 0, dtype=torch.long), torch.empty(0, dtype=torch.long)
 
     by_year = dated[years[dated].argsort()]
-    horizon = torch.searchsorted(
-        years[by_year].contiguous(), years[sources].contiguous(), right=True
-    )
+    ordered = years[by_year].contiguous()
+    if year_matched:
+        low = torch.searchsorted(ordered, years[cited].contiguous())
+        high = torch.searchsorted(ordered, years[cited].contiguous(), right=True)
+    else:
+        low = torch.zeros_like(sources)
+        high = torch.searchsorted(ordered, years[sources].contiguous(), right=True)
 
     targets = torch.zeros_like(sources)
-    pending = torch.arange(sources.numel())
+    pending = (high > low).nonzero(as_tuple=True)[0]
     for _ in range(SAMPLING_ATTEMPTS):
         if pending.numel() == 0:
             break
-        draw = (torch.rand(pending.numel(), generator=generator) * horizon[pending]).long()
+        span = high[pending] - low[pending]
+        draw = low[pending] + (torch.rand(pending.numel(), generator=generator) * span).long()
         candidate = by_year[draw]
         source = sources[pending]
         settled = (candidate != source) & ~torch.isin(source * count + candidate, existing)
         targets[pending[settled]] = candidate[settled]
         pending = pending[~settled]
 
-    found = torch.ones(sources.numel(), dtype=torch.bool)
+    found = high > low
     found[pending] = False
-    return torch.stack([sources[found], targets[found]])
+    return torch.stack([sources[found], targets[found]]), found.nonzero(as_tuple=True)[0]
 
 
 def _supervised(
@@ -180,7 +196,7 @@ def _supervised(
     count: int,
     generator: torch.Generator,
 ) -> Data:
-    negative = _negatives(positive[0], years, existing, count, generator)
+    negative, _ = sample_negatives(positive, years, existing, count, generator)
     return Data(
         x=x,
         edge_index=message,

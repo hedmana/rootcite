@@ -1,7 +1,15 @@
 import networkx as nx
 import pytest
+import torch
 
-from gnn.dataset import FEATURE_NAMES, build_dataset, load_dataset, save_dataset
+from gnn.dataset import (
+    FEATURE_NAMES,
+    build_dataset,
+    index_graph,
+    load_dataset,
+    sample_negatives,
+    save_dataset,
+)
 
 
 def citation_graph(years, edges):
@@ -85,6 +93,24 @@ def test_negatives_are_citations_that_could_have_happened_and_did_not():
             assert citing != cited
             assert years[cited] <= years[citing]
             assert not graph.has_edge(citing, cited)
+
+
+def test_year_matched_negatives_share_the_cited_works_year():
+    graph = cohorts()
+    node_ids, years, edges = index_graph(graph)
+    count = len(node_ids)
+    existing = (edges[0] * count + edges[1]).sort().values
+    positive = edges.repeat_interleave(5, dim=1)
+
+    negative, owner = sample_negatives(
+        positive, years, existing, count, torch.Generator().manual_seed(0), year_matched=True
+    )
+
+    assert negative.size(1) > 0
+    assert negative[0].equal(positive[0, owner])
+    assert years[negative[1]].equal(years[positive[1, owner]])
+    assert not torch.isin(negative[0] * count + negative[1], existing).any()
+    assert (negative[0] != negative[1]).all()
 
 
 def test_negatives_balance_the_positives_where_the_graph_leaves_room():
