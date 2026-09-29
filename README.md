@@ -71,6 +71,7 @@ uv run python -m graph.build --field gnn        # clean it into a dated snapshot
 uv run python -m gnn.dataset --field gnn        # cut the temporal link-prediction split
 uv run python -m gnn.train --field gnn          # fit, and score on citations it never saw
 uv run python -m gnn.evaluate --field gnn       # score it beside the heuristics it has to beat
+uv run python -m gnn.lineages --field gnn       # judge the rankings against fields/gold/gnn.yaml
 uv run python -m llm.narrative --field gnn --target W2519887557
 ```
 
