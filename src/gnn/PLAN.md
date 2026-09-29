@@ -18,17 +18,17 @@ Written 2026-09-29 against snapshot `gnn-20260924`.
 
 `logistic` is a logistic regression on year gap and target in-degree. Paired MRR over it, per run: uniform +0.010 ± 0.013 (11/15 wins), year-matched +0.031 ± 0.013 (15/15). The proxy gate holds under year-matched negatives; under uniform only AUC clears it (15/15), MRR is within spread.
 
-On the expanded snapshot (`gnn-20260929`, 9249 works, tested after 2022, 2023, 2024):
+On the served expanded snapshot (`gnn-20260929`, 9248 works, tested after 2022, 2023, 2024), trained for up to 600 epochs with patience 100:
 
 | Sampler | Scorer | AUC | MRR | Hits@10 |
 |---|---|---|---|---|
-| uniform | model | 0.926 ± 0.014 | 0.523 ± 0.012 | 0.783 ± 0.018 |
-| uniform | recency | 0.527 ± 0.003 | 0.029 ± 0.002 | 0.029 ± 0.012 |
-| uniform | logistic | 0.918 ± 0.004 | 0.506 ± 0.012 | 0.757 ± 0.016 |
-| year_matched | model | 0.879 ± 0.016 | 0.447 ± 0.014 | 0.729 ± 0.009 |
-| year_matched | logistic | 0.857 ± 0.005 | 0.444 ± 0.009 | 0.725 ± 0.005 |
+| uniform | model | 0.930 ± 0.003 | 0.515 ± 0.009 | 0.784 ± 0.009 |
+| uniform | recency | 0.530 ± 0.003 | 0.029 ± 0.002 | 0.030 ± 0.012 |
+| uniform | logistic | 0.915 ± 0.004 | 0.491 ± 0.012 | 0.749 ± 0.016 |
+| year_matched | model | 0.887 ± 0.010 | 0.446 ± 0.010 | 0.723 ± 0.008 |
+| year_matched | logistic | 0.857 ± 0.005 | 0.433 ± 0.013 | 0.718 ± 0.007 |
 
-Paired MRR over logistic: uniform +0.017 ± 0.013 (14/15), year-matched +0.002 ± 0.006 (10/15). In the GNN era citations pile onto a few hubs, so popularity alone nearly matches the model once the year is matched, and recency is worthless.
+Paired MRR over logistic: uniform +0.024 ± 0.008, year-matched +0.013 ± 0.003, 15/15 wins each; AUC wins 15/15 too. The proxy gate holds on the expanded snapshot. On a graph this dense, one step from a random start ranks by popularity alone, and learning more dips below that before it rises past it; with patience 40, training stopped at that first step, and the model only tied popularity.
 
 Why the model lost before:
 - Val/test sources have no out-edges in their message graph (cold start); every train positive was a message edge. Best epoch 3 of 23. Fixed by cold-start training.
@@ -62,8 +62,6 @@ Optional: blinded LLM pairwise judge, trusted only after it agrees with the gold
 
 ## Open decisions
 
-- Serve the expanded snapshot: move `data/expanded/gnn/snapshots/gnn-20260929` into `data/gnn/snapshots`, then `gnn.dataset` and `gnn.train`.
-- On the expanded snapshot the model only ties popularity under year-matched negatives: revisit training there, or let originator ranking evaluation decide.
 - Semantic Scholar as a second data source: citation influence labels, and the references OpenAlex holds under dead ids.
 - Who verifies the gold set (originator ranking evaluation).
 - Abstract embeddings need a new dependency; deferred until originator ranking evaluation shows text is the bottleneck.
