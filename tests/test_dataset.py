@@ -63,6 +63,16 @@ def test_splits_are_cuts_in_time_not_random_samples():
     assert dataset.report.train_edges > dataset.report.val_edges
 
 
+def test_a_year_heavier_than_its_share_does_not_swallow_the_next_split():
+    years = {"W0": 2001, "W1": 2002, "W2": 2003, "W3": 2004} | {f"N{i}": 2005 for i in range(6)}
+    edges = [("W1", "W0"), ("W2", "W1"), ("W3", "W2")] + [(f"N{i}", "W3") for i in range(6)]
+
+    report = build_dataset(citation_graph(years, edges), val_fraction=0.2, test_fraction=0.2).report
+
+    assert (report.train_until, report.val_until) == (2003, 2004)
+    assert (report.train_edges, report.val_edges, report.test_edges) == (2, 1, 6)
+
+
 def test_evaluation_splits_see_only_the_edges_that_preceded_them():
     dataset = build_dataset(cohorts(), val_fraction=0.2, test_fraction=0.2)
 

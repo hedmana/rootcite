@@ -148,12 +148,21 @@ def publication_order(x: Tensor) -> Tensor:
 
 
 def _cut_points(edge_years: Tensor, val_fraction: float, test_fraction: float) -> tuple[int, int]:
-    """The last training year and the last validation year, by share of citations."""
+    """The last training year and the last validation year, by share of citations.
+
+    A year's citations cannot be divided, so a year holding more than a split's
+    share would swallow the split after it. The cut steps back a year instead.
+    """
     ordered = edge_years.sort().values
     count = ordered.numel()
-    train_end = max(int(count * (1 - val_fraction - test_fraction)) - 1, 0)
-    val_end = max(int(count * (1 - test_fraction)) - 1, 0)
-    return int(ordered[train_end]), int(ordered[val_end])
+    train_until = int(ordered[max(int(count * (1 - val_fraction - test_fraction)) - 1, 0)])
+    val_until = int(ordered[max(int(count * (1 - test_fraction)) - 1, 0)])
+    years = ordered.unique()
+    if test_fraction and val_until == years[-1] and years.numel() > 1:
+        val_until = int(years[-2])
+    if val_fraction and train_until >= val_until and (earlier := years[years < val_until]).numel():
+        train_until = int(earlier[-1])
+    return train_until, val_until
 
 
 def sample_negatives(
