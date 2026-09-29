@@ -48,10 +48,13 @@ SPLITS = ("train", "val", "test")
 
 @dataclass
 class TrainConfig:
-    epochs: int = 400
+    epochs: int = 600
     learning_rate: float = 0.01
     weight_decay: float = 5e-4
-    patience: int = 40
+    # One step from a random start can rank by popularity alone, which a dense
+    # graph rewards; learning more dips below that first, so patience has to
+    # outlast the dip.
+    patience: int = 100
     held_out: float = 0.2
     seed: int = 0
 
