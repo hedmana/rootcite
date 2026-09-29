@@ -56,6 +56,7 @@ corrected_titles: {}    # records filed under another work's title
 crawl:
   hop_depth: 2          # references, backwards from the seeds
   forward_depth: 1      # works citing the seeds, within topic_id
+  fill_cited_by: 20     # uncrawled works this many crawled works cite
   date_range: { start: null, end: null }
 ```
 
