@@ -1,0 +1,168 @@
+# Gold lineages for `gnn.lineages`: papers, and the earlier works each was built on.
+#
+# An originator is a work the paper's method is built on, extends, or makes
+# trainable: not a tool, dataset, benchmark split, baseline, related work, or an
+# approach the paper replaces. Every entry was checked against the sentences in
+# which the paper cites the work (Semantic Scholar citation contexts), or where
+# those say too little, against the paper's abstract. Papers whose citations
+# come with no context were left out. Each originator is every OpenAlex id the
+# work goes by; any of them counts.
+#
+# `dev` papers may be used to tune the ranking; `test` papers only to report it.
+# The split alternates in publication order and was fixed before any tuning.
+
+lineages:
+  - target: W2116341502  # The Graph Neural Network Model (2008)
+    split: dev
+    originators:
+      - [W1501856433]  # Gori et al. 2005: the model's first form, by the same authors
+      - [W2166681504]  # Sperduti & Starita 1997: the recursive networks it extends, per its abstract
+      - [W2127827747]  # Frasconi et al. 1998: likewise
+      - [W1881179843]  # Almeida: its learning algorithm is based on Almeida-Pineda
+      - [W2007431958]  # Pineda 1987: likewise
+      - [W2066636486]  # Brin & Page 1998: the random-walk model it extends, per its abstract
+
+  - target: W1662382123  # Spectral Networks and Locally Connected Networks on Graphs (2013)
+    split: test
+    originators:
+      - [W2112796928, W2310919327]  # LeCun et al. 1998: the CNN it generalizes to graphs, per its abstract
+      - [W2156718197]  # Belkin & Niyogi 2002: the graph Laplacian as harmonic analysis on graphs
+      - [W2106869737]  # Coates & Ng 2011: feature similarity to build locally connected networks
+
+  - target: W2154851992  # DeepWalk (2014)
+    split: dev
+    originators:
+      - [W1614298861, W2950577311]  # Mikolov et al. 2013: the skip-gram relaxation it applies to walks
+      - [W2153579005]  # Mikolov et al. 2013: likewise
+
+  - target: W2405933695  # Learning Deep Representations for Graph Clustering (2014)
+    split: test
+    originators:
+      - [W2997574889, W2145094598]  # Vincent et al. 2010: stacked autoencoders, its building block
+      - [W2121947440]  # Shi & Malik 2000: the spectral clustering it recasts as reconstruction
+      - [W2132914434, W2949364901]  # von Luxburg 2007: likewise
+
+  - target: W1888005072  # LINE (2015)
+    split: dev
+    originators:
+      - [W2153579005]  # Mikolov et al. 2013: adopts its negative sampling
+
+  - target: W2173027866  # Convolutional Networks on Graphs for Learning Molecular Fingerprints (2015)
+    split: test
+    originators:
+      - [W1988037271]  # Rogers & Hahn 2010: the circular fingerprint it makes differentiable
+
+  - target: W2244807774  # Gated Graph Sequence Neural Networks (2015)
+    split: dev
+    originators:
+      - [W2116341502]  # Scarselli et al.: the GNN it modifies
+      - [W1501856433]  # Gori et al. 2005: likewise
+      - [W2950635152, W2157331557]  # Cho et al. 2014: the GRU it propagates with
+
+  - target: W2299115575  # Discriminative Embeddings of Latent Variable Models for Structured Dat (2016)
+    split: test
+    originators:
+      - [W1946137962]  # Smola et al. 2007: embeds graphical models into feature spaces
+      - [W2146641075]  # Song et al. 2009: likewise
+      - [W2159080219]  # Pearl 1988: belief propagation, one inference it embeds
+      - [W2120340025]  # Wainwright & Jordan 2008: mean field, the other
+
+  - target: W2519887557  # Semi-Supervised Classification with Graph Convolutional Networks (2016)
+    split: dev
+    originators:
+      - [W2468907370, W2964321699]  # Defferrard et al. 2016: GCN is its first-order case
+      - [W1662382123]  # Bruna et al.: its method is based on their spectral graph CNNs
+      - [W2158787690]  # Hammond et al. 2011: the Chebyshev approximation it truncates
+
+  - target: W2554952599  # Variational Graph Auto-Encoders (2016)
+    split: test
+    originators:
+      - [W1959608418]  # Kingma & Welling 2013: based on the variational autoencoder
+      - [W2519887557]  # GCN: its encoder
+
+  - target: W2962756421  # node2vec (2016)
+    split: dev
+    originators:
+      - [W2154851992]  # DeepWalk: the uniform walk it generalizes
+      - [W1614298861, W2950577311]  # Mikolov et al. 2013: extends skip-gram to networks
+      - [W2153579005]  # Mikolov et al. 2013: approximates with negative sampling
+
+  - target: W2604942799  # Community Preserving Network Embedding (2017)
+    split: test
+    originators:
+      - [W2135029798]  # Lee & Seung: its factorization and update rules
+      - [W2151936673]  # Newman 2006: adopts modularity maximization
+      - [W2015953751]  # Newman 2006: likewise
+      - [W1888005072]  # LINE: the first- and second-order proximities it preserves
+
+  - target: W2606780347  # Neural Message Passing for Quantum Chemistry (2017)
+    split: dev
+    originators:
+      - [W2244807774]  # GG-NN: its GRU update, and one of the models it unifies
+      - [W2173027866]  # Duvenaud et al.: one of the models it unifies
+      - [W2552391307]  # Battaglia et al. 2016, Interaction Networks: likewise
+      - [W2290847742]  # Kearnes et al. 2016, Molecular Graph Convolutions: likewise
+      - [W1662382123]  # Bruna et al.: likewise, among the Laplacian-based methods
+      - [W2468907370, W2964321699]  # Defferrard et al. 2016: likewise
+      - [W2519887557]  # GCN: likewise, treated as a special case
+
+  - target: W2624431344  # Inductive Representation Learning on Large Graphs (2017)
+    split: test
+    originators:
+      - [W2519887557]  # GCN: its convolutional variant extends GCN inductively
+      - [W2142498761]  # Shervashidze et al. 2011: the WL relabelling its algorithm mirrors
+
+  - target: W2766453196  # Graph Attention Networks (2017)
+    split: dev
+    originators:
+      - [W2133564696]  # Bahdanau et al. 2015: its attentional setup closely follows theirs
+      - [W2626778328]  # Vaswani et al. 2017: the self-attention that motivated it
+
+  - target: W2604314403  # Modeling Relational Data with Graph Convolutional Networks (2018)
+    split: test
+    originators:
+      - [W2519887557]  # GCN: motivated as an adaptation of previous work on GCNs
+      - [W1662382123]  # Bruna et al.: likewise
+      - [W2173027866]  # Duvenaud et al.: likewise
+      - [W2468907370, W2964321699]  # Defferrard et al.: likewise
+      - [W2606780347]  # Gilmer et al. 2017: a simplification of their message passing network
+      - [W1533230146, W2951077644]  # Yang et al. 2014, DistMult: its decoder
+
+  - target: W2786915849  # FastGCN: Fast Learning with Graph Convolutional Networks via Importanc (2018)
+    split: dev
+    originators:
+      - [W2519887557]  # GCN: the model it trains by importance sampling, per its abstract
+
+  - target: W2804057010  # Representation Learning on Graphs with Jumping Knowledge Networks (2018)
+    split: test
+    originators:
+      - [W2519887557]  # GCN: a neighbourhood aggregation model it adds layer aggregation to
+      - [W2624431344]  # GraphSAGE: likewise
+
+  - target: W2893944917  # Deep Graph Infomax. (2018)
+    split: dev
+    originators:
+      - [W2951873722]  # Hjelm et al. 2018, Deep InfoMax: follows its intuitions
+      - [W2519887557]  # GCN: its encoder
+
+  - target: W2951659295  # Hierarchical Graph Representation Learning with Differentiable Pooling (2018)
+    split: test
+    originators:
+      - [W2163605009]  # Krizhevsky et al. 2012: a graph analogue of CNN spatial pooling
+      - [W2624431344]  # GraphSAGE: its GNN module
+
+  - target: W2916106175  # Simplifying Graph Convolutional Networks (2019)
+    split: dev
+    originators:
+      - [W2519887557]  # GCN: the model it simplifies
+
+  - target: W2945827377  # Cluster-GCN (2019)
+    split: test
+    originators:
+      - [W2070232376]  # Karypis & Kumar 1998, METIS: the partitioning its batches come from
+      - [W2519887557]  # GCN: the model it makes trainable on large graphs
+
+  - target: W2961295589  # GraphSAINT: Graph Sampling Based Inductive Learning Method (2019)
+    split: dev
+    originators:
+      - [W2786915849]  # FastGCN: its sampler is inspired by their layer sampler
