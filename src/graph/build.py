@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # A preprint can be cited a year before the venue date OpenAlex gives it.
 PREPRINT_SLACK = 1
 
+# Citations `graph.semanticscholar` recovered, kept apart from the crawl's own.
+RECOVERED_EDGES = "recovered_edges.parquet"
+
 NODE_ATTRIBUTES = (
     "title",
     "abstract",
@@ -95,9 +98,11 @@ def is_missing(value: object) -> bool:
 
 
 def load_raw(raw_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Read the crawler's raw node and edge tables."""
+    """Read the crawler's raw node and edge tables, with any recovered citations."""
     nodes = pd.read_parquet(raw_dir / "nodes.parquet")
     edges = pd.read_parquet(raw_dir / "edges.parquet")
+    if (recovered := raw_dir / RECOVERED_EDGES).exists():
+        edges = pd.concat([edges, pd.read_parquet(recovered)], ignore_index=True)
     return nodes, edges
 
 
