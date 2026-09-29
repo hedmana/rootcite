@@ -53,18 +53,19 @@ One PR each, named for what it does.
   - Hashed title words: -0.02, overfits.
   - `topic_id`: +0.06, but it leaks. OpenAlex assigns topics from citations as of the crawl, the reason `cited_by_count` is excluded.
   - Held-out share, learning rate, depth, width, dropout, weight decay, and MRR instead of AP for checkpoint selection: nothing beyond noise.
-- [ ] **Originator ranking evaluation.** `gnn.lineages` is built: Recall@10 and nDCG@10 over reachable gold originators for the learned ranking, the same walk with equal weights, and every baseline; coverage apart; top-10 overlap across 3 training seeds and with 10% of citations dropped. Waiting on the gold set, `fields/gold/gnn.yaml` (not `fields/*.yaml`, which the API lists as fields): 18 targets drafted, being verified. On the draft, served snapshot:
+- [ ] **Originator ranking evaluation.** `gnn.lineages` is built: Recall@10 and nDCG@10 over reachable gold originators for the learned ranking, the same walk with equal weights, and every baseline; coverage apart; top-10 overlap across 3 training seeds and with 10% of citations dropped. Waiting on the gold set, `fields/gold/gnn.yaml` (not `fields/*.yaml`, which the API lists as fields): 18 targets drafted, being verified. On the draft, served snapshot, before and after recovering citations from Semantic Scholar:
 
-  | Scorer | Recall@10 | nDCG@10 | Overlap, 10% dropped |
-  |---|---|---|---|
-  | learned | 0.495 | 0.484 | 0.844 |
-  | equal-weight walk | 0.444 | 0.395 | 0.856 |
-  | time_decayed_pagerank | 0.432 | 0.380 | 0.833 |
-  | in_degree | 0.127 | 0.076 | 0.833 |
-  | gateway | 0.074 | 0.097 | 0.822 |
-  | path_weight | 0.000 | 0.000 | 0.939 |
+  | Scorer | Recall@10 | nDCG@10 | Overlap, 10% dropped | Gold found |
+  |---|---|---|---|---|
+  | learned | 0.484 / 0.465 | 0.466 / 0.439 | 0.844 / 0.894 | 45 / 44 |
+  | equal-weight walk | 0.410 / 0.397 | 0.366 / 0.333 | 0.844 / 0.867 | 38 / 38 |
+  | time_decayed_pagerank | 0.432 / 0.401 | 0.380 / 0.352 | 0.833 / 0.872 | 40 / 38 |
+  | in_degree | 0.127 / 0.097 | 0.076 / 0.060 | 0.833 / 0.861 | |
+  | gateway | 0.063 / 0.093 | 0.081 / 0.117 | 0.811 / 0.778 | |
+  | path_weight | 0.000 / 0.000 | 0.000 / 0.000 | 0.900 / 0.883 | |
 
-  Coverage 90/94; learned top-10 overlap across seeds 0.961. `path_weight` ranks 1980s foundations first, the failure time decay exists to prevent.
+  Coverage 90/94, then 92/94; learned top-10 overlap across seeds 0.94 to 0.95. The learned ranking leads, and the model's weights are worth +0.07 recall over the same walk unweighted. Recovered citations make more gold originators reachable and every ranking steadier when citations go missing, but find no more of them: recall is over reachable originators, so it drops as the denominator grows. `path_weight` ranks 1980s foundations first, the failure time decay exists to prevent.
+- [x] **Recovered citations.** `graph.semanticscholar`, an optional stage between crawl and build: 6811 MAG-era works' Semantic Scholar references matched back to crawled works by MAG id, else by title and year. 22582 citations matched, 6808 of them lost from OpenAlex; GCN regains Bruna, Henaff and Weston. Served.
 - [ ] **Citation influence labels.** Semantic Scholar `isInfluential` per citation; per-paper AUC of the decoder on influential vs incidental references.
 - [ ] **Influence-aligned objective.** Fine-tune the decoder listwise on influential references, link prediction as pretraining. Validate on the gold set.
 - [x] **Crawl expansion.** Uncapped backward crawl, plus `forward_depth: 1`: the in-topic works citing the seeds. 2789 works and 15k citations became 9249 and 104k. GAT is seeded by its primary record. Cleaning re-dates 262 works OpenAlex dates years after their citers, and a year heavier than its split's share no longer empties the split after it. Gold originators reachable from their targets: 88/94 to 90/94. The other four are references OpenAlex holds under dead ids (about 12% of all references), among them GCN's to Bruna, Henaff and Planetoid.
@@ -73,6 +74,5 @@ Optional: blinded LLM pairwise judge, trusted only after it agrees with the gold
 
 ## Open decisions
 
-- Semantic Scholar as a second data source: citation influence labels, and the references OpenAlex holds under dead ids.
 - Gold set verification, then commit `fields/gold/gnn.yaml` and rerun `gnn.lineages`.
 - Abstract embeddings need a new dependency; deferred until originator ranking evaluation shows text is the bottleneck.
