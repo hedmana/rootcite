@@ -68,6 +68,7 @@ uv run python -m graph.crawler --field gnn      # snowball crawl from the seed p
 uv run python -m graph.build --field gnn        # clean it into a dated snapshot
 uv run python -m gnn.dataset --field gnn        # cut the temporal link-prediction split
 uv run python -m gnn.train --field gnn          # fit, and score on citations it never saw
+uv run python -m gnn.evaluate --field gnn       # score it beside the heuristics it has to beat
 uv run python -m llm.narrative --field gnn --target W2519887557
 ```
 
@@ -137,7 +138,7 @@ uv run python -m llm "Reply with the single word: reachable."
 | ------------ | ----------------------------------------------------- |
 | `fields/`    | Field configs. The only field-specific code in the repo. |
 | `src/graph/` | OpenAlex client, crawler, graph construction, baseline scorers |
-| `src/gnn/`   | PyG dataset prep, training, originator scoring        |
+| `src/gnn/`   | PyG dataset prep, training, evaluation, originator scoring |
 | `src/llm/`   | Provider interface, LangGraph narrative orchestration |
 | `src/api/`   | FastAPI service                                       |
 | `frontend/`  | React + Vite client                                   |
