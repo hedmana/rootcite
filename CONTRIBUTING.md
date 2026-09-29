@@ -34,12 +34,12 @@ Every change follows the same loop:
    from (`Plan step: PR 7 (Phase 2)`).
 2. **Branch** off `main` using `<type>/<short-slug>`, for example
    `feat/openalex-client` or `fix/crawler-backoff`.
-3. **Commit atomically.** One logical change per commit, even though the PR is
-   squash-merged at the end. The commit trail inside a PR is where the reasoning
-   lives.
+3. **Commit atomically.** One logical change per commit. The commit trail is
+   where the reasoning lives, and it lands on `main` intact.
 4. **Open a PR** that closes the issue (`Closes #12`) and answers three questions:
    what changed, why, and how to verify it by hand.
-5. **Squash-merge** once CI is green.
+5. **Merge with a merge commit** once CI is green, never a squash, so every
+   commit in the PR survives on `main`.
 
 Use draft PRs for anything that wants feedback before it is finished.
 
