@@ -35,10 +35,11 @@ def test_a_paper_with_nothing_findable_has_nothing_to_score():
 
 def test_gold_files_are_checked_on_load(tmp_path):
     path = tmp_path / "gold.yaml"
-    path.write_text("lineages:\n  - target: W1\n    originators: [[W2, W3], [W4]]\n")
-    assert load_gold(path) == [Lineage(target="W1", originators=[["W2", "W3"], ["W4"]])]
+    path.write_text("lineages:\n- target: W1\n  split: dev\n  originators: [[W2, W3], [W4]]\n")
+    expected = Lineage(target="W1", split="dev", originators=[["W2", "W3"], ["W4"]])
+    assert load_gold(path) == [expected]
 
-    path.write_text("lineages:\n  - target: W1\n    originators: W2\n")
+    path.write_text("lineages:\n  - target: W1\n    split: train\n    originators: [[W2]]\n")
     with pytest.raises(ValidationError):
         load_gold(path)
 
@@ -67,14 +68,17 @@ def test_the_unweighted_walk_is_the_learned_walk_of_an_indifferent_model():
 def test_an_assessment_judges_covers_and_stresses_every_scorer():
     graph = lineage([("T", "A"), ("T", "B"), ("A", "G"), ("B", "X"), ("U", "T")])
     gold = [
-        Lineage(target="T", originators=[["G"], ["NEVER-CRAWLED"]]),
-        Lineage(target="ABSENT", originators=[["G"]]),
+        Lineage(target="T", split="dev", originators=[["G"], ["NEVER-CRAWLED"]]),
+        Lineage(target="B", split="test", originators=[["X"]]),
+        Lineage(target="ABSENT", split="test", originators=[["G"]]),
     ]
 
     result = assess(graph, gold, FixedOpinion(graph, [("T", "A"), ("A", "G")]), seeds=1)
+    dev, test = result["splits"]["dev"], result["splits"]["test"]
 
-    assert result["targets_in_graph"] == "1/2"
-    assert result["coverage"] == "1/2"
-    assert set(result["scorers"]) >= {"learned", "uniform_flow", "in_degree", "gateway"}
-    assert result["scorers"]["learned"]["recall"] == 1.0
+    assert result["targets_in_graph"] == "2/3"
+    assert (dev["coverage"], test["coverage"]) == ("1/2", "1/1")
+    assert set(dev["scorers"]) >= {"learned", "uniform_flow", "in_degree", "gateway"}
+    assert dev["scorers"]["learned"]["recall"] == 1.0
+    assert dev["scorers"]["learned"]["found"] == "1/2"
     assert "U" not in result["targets"][0]["scorers"]["learned"]["top"]

@@ -25,6 +25,7 @@ import math
 import random
 from itertools import combinations
 from pathlib import Path
+from typing import Literal
 
 import networkx as nx
 import yaml
@@ -47,6 +48,8 @@ GOLD_DIR = FIELDS_DIR / "gold"
 
 class Lineage(BaseModel):
     target: str
+    # `dev` papers may steer changes to the ranking; `test` papers only report it.
+    split: Literal["dev", "test"]
     # One entry per work, as every OpenAlex id it goes by: any of them counts.
     originators: list[list[str]]
 
@@ -148,6 +151,7 @@ def assess(
         targets.append(
             {
                 "target": lineage.target,
+                "split": lineage.split,
                 "title": None if is_missing(title) else str(title),
                 "originators": len(lineage.originators),
                 "reachable": len(findable),
@@ -156,6 +160,7 @@ def assess(
                     name: dict(
                         zip(("recall", "ndcg"), judge(ranking, findable, top), strict=True),
                         dropout_overlap=_overlap(ranking, stressed[name]),
+                        found=sum(bool(set(ranking) & set(ids)) for ids in lineage.originators),
                         top=ranking,
                     )
                     for name, ranking in ranked.items()
@@ -163,37 +168,57 @@ def assess(
             }
         )
 
-    names = targets[0]["scorers"] if targets else {}
-    reachable, originators = (sum(t[key] for t in targets) for key in ("reachable", "originators"))
     return {
         "top": top,
         "targets_in_graph": f"{len(lineages)}/{len(gold)}",
-        "coverage": f"{reachable}/{originators}",
-        "seed_overlap": _mean(t["seed_overlap"] for t in targets),
-        "scorers": {
-            name: {
-                metric: _mean(t["scorers"][name][metric] for t in targets)
-                for metric in ("recall", "ndcg", "dropout_overlap")
-            }
-            for name in names
+        "splits": {
+            split: _summarise([t for t in targets if t["split"] == split])
+            for split in ("dev", "test")
         },
         "targets": targets,
     }
 
 
+def _summarise(targets: list[dict]) -> dict:
+    """Means over papers, except gold found, which is counted over every originator."""
+    names = targets[0]["scorers"] if targets else {}
+    reachable, originators = (sum(t[key] for t in targets) for key in ("reachable", "originators"))
+    return {
+        "coverage": f"{reachable}/{originators}",
+        "seed_overlap": _mean(t["seed_overlap"] for t in targets),
+        "scorers": {
+            name: {
+                **{
+                    metric: _mean(t["scorers"][name][metric] for t in targets)
+                    for metric in ("recall", "ndcg", "dropout_overlap")
+                },
+                "found": f"{sum(t['scorers'][name]['found'] for t in targets)}/{originators}",
+            }
+            for name in names
+        },
+    }
+
+
 def log_assessment(result: dict) -> None:
-    logger.info("%-22s %10s %10s %16s", "scorer", "recall", "ndcg", "dropout overlap")
-    for name, metrics in result["scorers"].items():
+    logger.info("gold targets in graph %s", result["targets_in_graph"])
+    for split, summary in result["splits"].items():
         logger.info(
-            "%-22s %10.3f %10.3f %16.3f",
-            name,
-            metrics["recall"],
-            metrics["ndcg"],
-            metrics["dropout_overlap"],
+            "\n%s: originators reachable %s, learned top-%d overlap across seeds %.3f",
+            split,
+            summary["coverage"],
+            result["top"],
+            summary["seed_overlap"],
         )
-    logger.info("gold targets in graph      %s", result["targets_in_graph"])
-    logger.info("gold originators reachable %s", result["coverage"])
-    logger.info("learned top-%d overlap across seeds %.3f", result["top"], result["seed_overlap"])
+        logger.info("%-22s %8s %8s %8s %10s", "scorer", "found", "recall", "ndcg", "dropout")
+        for name, metrics in summary["scorers"].items():
+            logger.info(
+                "%-22s %8s %8.3f %8.3f %10.3f",
+                name,
+                metrics["found"],
+                metrics["recall"],
+                metrics["ndcg"],
+                metrics["dropout_overlap"],
+            )
 
 
 def assess_field(
