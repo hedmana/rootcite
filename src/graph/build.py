@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
@@ -44,6 +45,7 @@ class CleaningReport:
 
     raw_nodes: int = 0
     raw_edges: int = 0
+    excluded_nodes: int = 0
     duplicate_nodes: int = 0
     duplicate_edges: int = 0
     out_of_range_nodes: int = 0
@@ -104,6 +106,7 @@ def clean(
     edges: pd.DataFrame,
     *,
     date_range: DateRange | None = None,
+    exclude: Iterable[str] = (),
     largest_component_only: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, CleaningReport]:
     """Reduce raw crawl tables to a consistent node set and edge set."""
@@ -111,6 +114,10 @@ def clean(
 
     nodes = nodes.drop_duplicates(subset="id")
     report.duplicate_nodes = report.raw_nodes - len(nodes)
+
+    excluded = nodes["id"].isin(set(exclude))
+    report.excluded_nodes = int(excluded.sum())
+    nodes = nodes[~excluded]
 
     if date_range is not None:
         in_range = nodes["publication_year"].map(date_range.contains)
@@ -266,6 +273,7 @@ def build_field(
         nodes,
         edges,
         date_range=config.crawl.date_range,
+        exclude=config.exclude_works,
         largest_component_only=largest_component_only,
     )
     surviving = set(nodes["id"])

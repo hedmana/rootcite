@@ -32,6 +32,7 @@ class FieldConfig(BaseModel):
     description: str
     topic_id: str | None = None
     seed_papers: list[str] = Field(default_factory=list)
+    exclude_works: list[str] = Field(default_factory=list)
     crawl: CrawlConfig
 
     @field_validator("description")
