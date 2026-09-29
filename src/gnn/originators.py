@@ -64,11 +64,7 @@ def learned_flow(
     half_life: float = 10.0,
     embedding: tuple[dict[str, int], Tensor] | None = None,
 ) -> Scores:
-    """Weight of a damped walk backwards from `target`, steered by the model.
-
-    Exact rather than iterated: the lineage is acyclic, so one pass in
-    topological order settles every node's share.
-    """
+    """Weight of a damped walk backwards from `target`, steered by the model."""
     lineage = acyclic(ancestry(graph, target))
     position, z = embedding or embed(graph, model)
 
@@ -76,21 +72,36 @@ def learned_flow(
     plausibility = dict(
         zip(edges, citation_probability(model, z, position, edges).tolist(), strict=True)
     )
+    return flow(lineage, target, plausibility, damping=damping, half_life=half_life)
 
-    flow = dict.fromkeys(lineage, 0.0)
-    flow[target] = 1.0
+
+def flow(
+    lineage: nx.DiGraph,
+    target: str,
+    weight: dict[tuple[str, str], float] | None = None,
+    *,
+    damping: float = 0.85,
+    half_life: float = 10.0,
+) -> Scores:
+    """The damped walk itself, splitting each step by `weight`, or evenly without one.
+
+    Exact rather than iterated: the lineage is acyclic, so one pass in
+    topological order settles every node's share.
+    """
+    reached = dict.fromkeys(lineage, 0.0)
+    reached[target] = 1.0
     for node in nx.topological_sort(lineage):
         cited = list(lineage.successors(node))
-        shares = [plausibility[(node, work)] for work in cited]
+        shares = [1.0 if weight is None else weight[(node, work)] for work in cited]
         total = sum(shares)
         if not total:
             continue
         for work, share in zip(cited, shares, strict=True):
-            flow[work] += flow[node] * damping * share / total
+            reached[work] += reached[node] * damping * share / total
 
     return {
-        node: weight * 0.5 ** (year_gap(lineage, target, node) / half_life)
-        for node, weight in flow.items()
+        node: share * 0.5 ** (year_gap(lineage, target, node) / half_life)
+        for node, share in reached.items()
         if node != target
     }
 
