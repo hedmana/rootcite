@@ -32,6 +32,7 @@ class CrawlState:
     frontier: list[str] = field(default_factory=list)
     next_frontier: list[str] = field(default_factory=list)
     forward: bool = False
+    filled: bool = False
 
 
 class CrawlJournal:
@@ -67,6 +68,10 @@ class CrawlJournal:
                 nodes.write(json.dumps(work.model_dump()) + "\n")
                 for reference in work.referenced_works:
                     edges.write(json.dumps({"source": work.id, "target": reference}) + "\n")
+
+    def edges(self) -> pd.DataFrame:
+        """Every reference journalled so far, fetched or not."""
+        return self._read(self.edges_path)
 
     def _read(self, path: Path) -> pd.DataFrame:
         if not path.exists() or path.stat().st_size == 0:
@@ -178,6 +183,36 @@ class SnowballCrawler:
             state.next_frontier = []
             self.journal.save_state(state)
 
+        return self._fill(state, visited)
+
+    def _fill(self, state: CrawlState, visited: set[str]) -> CrawlState:
+        """Fetch the works the crawl cites often but never reached, without following them.
+
+        Neither direction reaches a work from outside the field that the field
+        builds on, such as an attention mechanism from machine translation: the
+        backward crawl stops at its hop depth, and the forward crawl records the
+        references of the works it takes in without following them. Cited by
+        `fill_cited_by` crawled works or more, such a work is fetched once.
+        """
+        threshold = self.config.crawl.fill_cited_by
+        if not threshold or state.filled:
+            return state
+
+        edges = self.journal.edges()
+        unfetched = edges.loc[~edges["target"].isin(visited), "target"] if len(edges) else []
+        counts = pd.Series(unfetched).value_counts()
+        pending = list(counts[counts >= threshold].index)
+        logger.info("fill: %d works cited by %d or more crawled works", len(pending), threshold)
+
+        # An interrupted fill is found again by recounting, so it keeps no frontier.
+        for batch in self._fetch(pending, visited, False, CrawlState()):
+            self.journal.append(batch)
+            if self.max_nodes and len(visited) >= self.max_nodes:
+                logger.info("stopping at max_nodes=%d", self.max_nodes)
+                return state
+
+        state.filled = True
+        self.journal.save_state(state)
         return state
 
     def _citing(self, work_id: str) -> Iterator[Work]:

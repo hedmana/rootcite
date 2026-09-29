@@ -48,7 +48,7 @@ class FakeClient:
 DESCENDANTS = {**CITATIONS, "X": ["A", "B"], "Y": ["A", "Z"], "W": ["X"]}
 
 
-def make_config(hop_depth=2, start=None, end=None, seeds=("A",), forward_depth=0):
+def make_config(hop_depth=2, start=None, end=None, seeds=("A",), forward_depth=0, fill=0):
     return FieldConfig(
         name="test",
         display_name="Test",
@@ -58,6 +58,7 @@ def make_config(hop_depth=2, start=None, end=None, seeds=("A",), forward_depth=0
         crawl=CrawlConfig(
             hop_depth=hop_depth,
             forward_depth=forward_depth,
+            fill_cited_by=fill,
             date_range=DateRange(start=start, end=end),
         ),
     )
@@ -216,6 +217,31 @@ def test_an_interrupted_forward_crawl_resumes_without_losing_citers(tmp_path):
 
     assert node_ids(journal) == ["A", "B", "C", "D", "E", "X", "Y"]
     assert resumed.requested == [["X", "Y"]]
+
+
+def test_works_cited_often_enough_are_fetched_but_not_followed(tmp_path):
+    journal, _ = crawl(tmp_path, make_config(hop_depth=1, fill=2))
+
+    # D is cited by B and C, E only by C, and D's own reference F is not followed.
+    assert node_ids(journal) == ["A", "B", "C", "D"]
+    assert ("D", "F") in edge_pairs(journal)
+
+
+def test_the_fill_runs_once(tmp_path):
+    config = make_config(hop_depth=1, fill=1)
+    crawl(tmp_path, config)
+
+    again = FakeClient()
+    SnowballCrawler(config, again, CrawlJournal(tmp_path)).run()
+
+    assert "F" not in node_ids(CrawlJournal(tmp_path))
+    assert again.requested == []
+
+
+def test_without_a_fill_threshold_nothing_is_filled(tmp_path):
+    journal, _ = crawl(tmp_path, make_config(hop_depth=1))
+
+    assert node_ids(journal) == ["A", "B", "C"]
 
 
 def test_max_nodes_is_exact_regardless_of_checkpoint_size(tmp_path):
