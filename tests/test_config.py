@@ -58,6 +58,18 @@ def test_name_must_match_filename(tmp_path):
         load_field("onfile", tmp_path)
 
 
+def test_a_forward_crawl_needs_a_topic_to_bound_it(tmp_path):
+    path = write_config(tmp_path)
+    path.write_text(
+        path.read_text()
+        .replace("topic_id: T1", "topic_id: null")
+        .replace("hop_depth: 2", "hop_depth: 2\n  forward_depth: 1")
+    )
+
+    with pytest.raises(ValidationError, match="forward_depth needs a topic_id"):
+        load_field("test", tmp_path)
+
+
 def test_negative_hop_depth_is_rejected(tmp_path):
     write_config(tmp_path, hop_depth=-1)
 

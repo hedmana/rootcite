@@ -31,6 +31,7 @@ class CrawlState:
     depth: int = 0
     frontier: list[str] = field(default_factory=list)
     next_frontier: list[str] = field(default_factory=list)
+    forward: bool = False
 
 
 class CrawlJournal:
@@ -99,6 +100,11 @@ class SnowballCrawler:
     lineage runs that way. Works outside the field's date range are still
     recorded, but are not expanded through: they bound the crawl without
     silently dropping edges the cleaning stage may want to see.
+
+    Backwards alone, the graph is the seeds' past and nothing after them: the
+    work the field went on to do is neither traceable nor there to learn from.
+    So once the backward crawl is done, a forward one takes in the works citing
+    the seeds, `forward_depth` hops out, kept inside the field by its topic.
     """
 
     def __init__(
@@ -122,7 +128,7 @@ class SnowballCrawler:
             frontier=_dedup(self.config.seed_papers, set())
         )
 
-        while state.depth <= self.config.crawl.hop_depth:
+        while not state.forward and state.depth <= self.config.crawl.hop_depth:
             pending = _dedup(state.frontier, visited)
             logger.info("depth %d: %d works to fetch", state.depth, len(pending))
             expand = state.depth < self.config.crawl.hop_depth
@@ -145,7 +151,43 @@ class SnowballCrawler:
             if not state.frontier:
                 break
 
+        if not state.forward:
+            state = CrawlState(frontier=list(self.config.seed_papers), forward=True)
+            self.journal.save_state(state)
+
+        while state.depth < self.config.crawl.forward_depth and state.frontier:
+            logger.info("forward %d: %d works to expand", state.depth + 1, len(state.frontier))
+            while state.frontier:
+                citing = list(self._citing(state.frontier[0]))
+                fresh = _dedup((work.id for work in citing), visited)
+                if self.max_nodes:
+                    fresh = fresh[: max(self.max_nodes - len(visited), 0)]
+                chosen = set(fresh)
+                self.journal.append(work for work in citing if work.id in chosen)
+                visited.update(fresh)
+                if self.max_nodes and len(visited) >= self.max_nodes:
+                    # The work stays on the frontier, so a resumed crawl asks again.
+                    logger.info("stopping at max_nodes=%d", self.max_nodes)
+                    return state
+                state.next_frontier.extend(work.id for work in citing)
+                state.frontier = state.frontier[1:]
+                self.journal.save_state(state)
+
+            state.depth += 1
+            state.frontier = _dedup(state.next_frontier, set())
+            state.next_frontier = []
+            self.journal.save_state(state)
+
         return state
+
+    def _citing(self, work_id: str) -> Iterator[Work]:
+        date_range = self.config.crawl.date_range
+        return self.client.citing_works(
+            work_id,
+            topic_id=self.config.topic_id,
+            from_year=date_range.start,
+            to_year=date_range.end,
+        )
 
     def _fetch(
         self,

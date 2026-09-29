@@ -24,6 +24,7 @@ class FakeClient:
         self.citations = citations or CITATIONS
         self.years = years or {}
         self.requested = []
+        self.cited = []
 
     def works(self, work_ids):
         work_ids = list(work_ids)
@@ -37,15 +38,28 @@ class FakeClient:
                     referenced_works=self.citations[work_id],
                 )
 
+    def citing_works(self, work_id, **bounds):
+        self.cited.append((work_id, bounds))
+        citing = [work for work, references in self.citations.items() if work_id in references]
+        yield from self.works(citing)
 
-def make_config(hop_depth=2, start=None, end=None, seeds=("A",)):
+
+# The works citing A, and one citing those in turn, which only a backward crawl misses.
+DESCENDANTS = {**CITATIONS, "X": ["A", "B"], "Y": ["A", "Z"], "W": ["X"]}
+
+
+def make_config(hop_depth=2, start=None, end=None, seeds=("A",), forward_depth=0):
     return FieldConfig(
         name="test",
         display_name="Test",
         description="test field",
         topic_id="T1",
         seed_papers=list(seeds),
-        crawl=CrawlConfig(hop_depth=hop_depth, date_range=DateRange(start=start, end=end)),
+        crawl=CrawlConfig(
+            hop_depth=hop_depth,
+            forward_depth=forward_depth,
+            date_range=DateRange(start=start, end=end),
+        ),
     )
 
 
@@ -161,6 +175,47 @@ def test_empty_journal_produces_empty_tables(tmp_path):
 
     assert pd.read_parquet(nodes_path).empty
     assert pd.read_parquet(edges_path).empty
+
+
+def test_a_forward_crawl_takes_in_the_works_citing_the_seeds(tmp_path):
+    client = FakeClient(DESCENDANTS)
+    journal, _ = crawl(tmp_path, make_config(forward_depth=1), client)
+
+    assert node_ids(journal) == ["A", "B", "C", "D", "E", "X", "Y"]
+    assert {("X", "A"), ("X", "B"), ("Y", "A"), ("Y", "Z")} <= set(edge_pairs(journal))
+
+
+def test_each_forward_hop_reaches_one_generation_further(tmp_path):
+    journal, _ = crawl(tmp_path, make_config(forward_depth=2), FakeClient(DESCENDANTS))
+
+    assert "W" in node_ids(journal)
+
+
+def test_the_forward_crawl_stays_inside_the_topic_and_years(tmp_path):
+    client = FakeClient(DESCENDANTS)
+    crawl(tmp_path, make_config(forward_depth=1, start=2000, end=2020), client)
+
+    assert client.cited == [("A", {"topic_id": "T1", "from_year": 2000, "to_year": 2020})]
+
+
+def test_without_a_forward_depth_no_citing_works_are_asked_for(tmp_path):
+    client = FakeClient(DESCENDANTS)
+    journal, _ = crawl(tmp_path, make_config(), client)
+
+    assert client.cited == []
+    assert "X" not in node_ids(journal)
+
+
+def test_an_interrupted_forward_crawl_resumes_without_losing_citers(tmp_path):
+    config = make_config(forward_depth=1)
+    crawl(tmp_path, config, FakeClient(DESCENDANTS), max_nodes=6, checkpoint_every=1)
+
+    resumed = FakeClient(DESCENDANTS)
+    SnowballCrawler(config, resumed, CrawlJournal(tmp_path), checkpoint_every=1).run()
+    journal = CrawlJournal(tmp_path)
+
+    assert node_ids(journal) == ["A", "B", "C", "D", "E", "X", "Y"]
+    assert resumed.requested == [["X", "Y"]]
 
 
 def test_max_nodes_is_exact_regardless_of_checkpoint_size(tmp_path):

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 FIELDS_DIR = Path(__file__).resolve().parents[2] / "fields"
 
@@ -22,6 +22,7 @@ class DateRange(BaseModel):
 
 class CrawlConfig(BaseModel):
     hop_depth: int = Field(ge=0)
+    forward_depth: int = Field(default=0, ge=0)
     date_range: DateRange = Field(default_factory=DateRange)
 
 
@@ -37,6 +38,14 @@ class FieldConfig(BaseModel):
     @classmethod
     def _collapse_whitespace(cls, value: str) -> str:
         return " ".join(value.split())
+
+    @model_validator(mode="after")
+    def _bound_the_forward_crawl(self) -> FieldConfig:
+        # A seed's citers span every field that ever borrowed from it; the topic
+        # is the only thing keeping a forward crawl inside this one.
+        if self.crawl.forward_depth and not self.topic_id:
+            raise ValueError("crawl.forward_depth needs a topic_id to bound it")
+        return self
 
 
 def load_field(name: str, fields_dir: Path | None = None) -> FieldConfig:
