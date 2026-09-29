@@ -23,6 +23,7 @@ class DateRange(BaseModel):
 class CrawlConfig(BaseModel):
     hop_depth: int = Field(ge=0)
     forward_depth: int = Field(default=0, ge=0)
+    fill_cited_by: int = Field(default=0, ge=0)
     date_range: DateRange = Field(default_factory=DateRange)
 
 

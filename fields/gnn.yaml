@@ -50,6 +50,10 @@ crawl:
   # topic_id are taken in, or the crawl would follow every field that ever
   # cited a seed.
   forward_depth: 1
+  # Works outside the crawl that this many crawled works cite, such as an
+  # attention mechanism from machine translation, are fetched too, but not
+  # followed. Neither direction of the crawl would reach them otherwise.
+  fill_cited_by: 20
   # Publication years to keep. Bounds are inclusive; null means unbounded.
   date_range:
     start: 1980
