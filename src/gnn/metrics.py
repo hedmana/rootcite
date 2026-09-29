@@ -1,8 +1,8 @@
 """Ranking metrics for link prediction.
 
-Both answer the same question a citation ranking asks: are the real citations
-above the imagined ones? Neither needs a threshold, and neither needs a
-dependency beyond torch.
+Each answers the same question a citation ranking asks: are the real citations
+above the imagined ones? None needs a threshold, and none needs a dependency
+beyond torch.
 """
 
 from __future__ import annotations
@@ -18,9 +18,11 @@ def roc_auc(scores: Tensor, labels: Tensor) -> float:
     if not hits or not misses:
         return float("nan")
 
-    # Ranks by position, so equal scores are ordered arbitrarily rather than tied.
-    ranks = torch.empty_like(scores, dtype=torch.float)
-    ranks[scores.argsort()] = torch.arange(1, scores.numel() + 1, dtype=torch.float)
+    # Equal scores share the mean of the ranks they span, so a tie counts as half
+    # a win. Heuristic scores tie constantly, and ordering them by position would
+    # let the order the labels were concatenated in decide the metric.
+    _, group, sizes = torch.unique(scores, return_inverse=True, return_counts=True)
+    ranks = (sizes.cumsum(0) - (sizes - 1) / 2)[group]
     return float((ranks[positives].sum() - hits * (hits + 1) / 2) / (hits * misses))
 
 
@@ -33,3 +35,15 @@ def average_precision(scores: Tensor, labels: Tensor) -> float:
     found = positives.cumsum(0)
     precision = found / torch.arange(1, positives.numel() + 1)
     return float(precision[positives].mean())
+
+
+def positive_ranks(positive: Tensor, negative: Tensor, owner: Tensor) -> Tensor:
+    """Where each true citation places among the non-citations drawn for it, 1 being first.
+
+    `owner` names, for every negative, the positive it was drawn against. A tie
+    counts as half a loss, so a scorer that cannot tell the two apart lands
+    mid-table rather than on top.
+    """
+    rival = positive[owner]
+    lost = (negative > rival).float() + (negative == rival).float() / 2
+    return torch.zeros(positive.numel()).scatter_add_(0, owner, lost) + 1
