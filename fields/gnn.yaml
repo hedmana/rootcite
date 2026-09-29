@@ -29,11 +29,15 @@ seed_papers:
   - W2519887557  # Semi-Supervised Classification with Graph Convolutional Networks (2016)
   - W2606780347  # Neural Message Passing for Quantum Chemistry (2017)
   - W2624431344  # Inductive Representation Learning on Large Graphs (2017)
-  - W4297733535  # Graph Attention Networks (2017)
+  - W2766453196  # Graph Attention Networks (2017)
 
 crawl:
   # How many citation hops to expand outward from the seeds.
   hop_depth: 2
+  # How many hops forward, to the works citing the seeds. Only works under
+  # topic_id are taken in, or the crawl would follow every field that ever
+  # cited a seed.
+  forward_depth: 1
   # Publication years to keep. Bounds are inclusive; null means unbounded.
   date_range:
     start: 1980

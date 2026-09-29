@@ -18,12 +18,24 @@ Written 2026-09-29 against snapshot `gnn-20260924`.
 
 `logistic` is a logistic regression on year gap and target in-degree. Paired MRR over it, per run: uniform +0.010 ± 0.013 (11/15 wins), year-matched +0.031 ± 0.013 (15/15). The proxy gate holds under year-matched negatives; under uniform only AUC clears it (15/15), MRR is within spread.
 
+On the expanded snapshot (`gnn-20260929`, 9249 works, tested after 2022, 2023, 2024):
+
+| Sampler | Scorer | AUC | MRR | Hits@10 |
+|---|---|---|---|---|
+| uniform | model | 0.926 ± 0.014 | 0.523 ± 0.012 | 0.783 ± 0.018 |
+| uniform | recency | 0.527 ± 0.003 | 0.029 ± 0.002 | 0.029 ± 0.012 |
+| uniform | logistic | 0.918 ± 0.004 | 0.506 ± 0.012 | 0.757 ± 0.016 |
+| year_matched | model | 0.879 ± 0.016 | 0.447 ± 0.014 | 0.729 ± 0.009 |
+| year_matched | logistic | 0.857 ± 0.005 | 0.444 ± 0.009 | 0.725 ± 0.005 |
+
+Paired MRR over logistic: uniform +0.017 ± 0.013 (14/15), year-matched +0.002 ± 0.006 (10/15). In the GNN era citations pile onto a few hubs, so popularity alone nearly matches the model once the year is matched, and recency is worthless.
+
 Why the model lost before:
 - Val/test sources have no out-edges in their message graph (cold start); every train positive was a message edge. Best epoch 3 of 23. Fixed by cold-start training.
 - Negatives were sampled once; degree features included supervision edges. Fixed by cold-start training.
 - Uniform negatives make recency sufficient.
 - `learned_flow` weights a paper's existing references; nothing measures that.
-- Crawl is backward-only, capped at 3000 works, 81% of edges dangle. Train cut is 2010, so it mostly learns pre-GNN citation habits.
+- Crawl was backward-only and capped at 3000 works, so training cut at 2010 and learned pre-GNN citation habits. Fixed by crawl expansion, except references OpenAlex holds under dead ids.
 
 ## Gates
 
@@ -41,16 +53,17 @@ One PR each, named for what it does.
   - Hashed title words: -0.02, overfits.
   - `topic_id`: +0.06, but it leaks. OpenAlex assigns topics from citations as of the crawl, the reason `cited_by_count` is excluded.
   - Held-out share, learning rate, depth, width, dropout, weight decay, and MRR instead of AP for checkpoint selection: nothing beyond noise.
-- [ ] **Originator ranking evaluation.** Gold lineages for 20-30 targets in `fields/gnn.gold.yaml`, from survey history sections. nDCG@10 and Recall@10 vs all baselines. Ablation: `learned_flow` with uniform edge weights. Stability: top-10 overlap across seeds and 10% edge dropout.
+- [ ] **Originator ranking evaluation.** Gold lineages for 20-30 targets in `fields/gold/gnn.yaml` (not `fields/*.yaml`, which the API lists as fields), from survey history sections. nDCG@10 and Recall@10 vs all baselines. Ablation: `learned_flow` with uniform edge weights. Stability: top-10 overlap across seeds and 10% edge dropout.
 - [ ] **Citation influence labels.** Semantic Scholar `isInfluential` per citation; per-paper AUC of the decoder on influential vs incidental references.
 - [ ] **Influence-aligned objective.** Fine-tune the decoder listwise on influential references, link prediction as pretraining. Validate on the gold set.
-- [ ] **Crawl expansion** (parallel, after link evaluation). Raise `max_nodes`, add forward expansion via `citing_works` filtered by `topic_id`. Rerun link evaluation.
+- [x] **Crawl expansion.** Uncapped backward crawl, plus `forward_depth: 1`: the in-topic works citing the seeds. 2789 works and 15k citations became 9249 and 104k. GAT is seeded by its primary record. Cleaning re-dates 262 works OpenAlex dates years after their citers, and a year heavier than its split's share no longer empties the split after it. Gold originators reachable from their targets: 88/94 to 90/94. The other four are references OpenAlex holds under dead ids (about 12% of all references), among them GCN's to Bruna, Henaff and Planetoid.
 
 Optional: blinded LLM pairwise judge, trusted only after it agrees with the gold set.
 
 ## Open decisions
 
-- Uniform MRR is within spread: accept the proxy gate on year-matched and AUC, or do crawl expansion before originator ranking evaluation.
-- Semantic Scholar as a second data source (citation influence labels).
+- Serve the expanded snapshot: move `data/expanded/gnn/snapshots/gnn-20260929` into `data/gnn/snapshots`, then `gnn.dataset` and `gnn.train`.
+- On the expanded snapshot the model only ties popularity under year-matched negatives: revisit training there, or let originator ranking evaluation decide.
+- Semantic Scholar as a second data source: citation influence labels, and the references OpenAlex holds under dead ids.
 - Who verifies the gold set (originator ranking evaluation).
 - Abstract embeddings need a new dependency; deferred until originator ranking evaluation shows text is the bottleneck.
