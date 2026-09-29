@@ -83,6 +83,23 @@ class Work(BaseModel):
         }
 
 
+def _filter(
+    *conditions: str,
+    topic_id: str | None = None,
+    from_year: int | None = None,
+    to_year: int | None = None,
+) -> str:
+    """Join filter conditions, adding a topic and publication-year bounds where given."""
+    filters = list(conditions)
+    if topic_id is not None:
+        filters.append(f"primary_topic.id:{strip_id_prefix(topic_id)}")
+    if from_year is not None:
+        filters.append(f"from_publication_date:{from_year}-01-01")
+    if to_year is not None:
+        filters.append(f"to_publication_date:{to_year}-12-31")
+    return ",".join(filters)
+
+
 def _chunked(values: Iterable[str], size: int) -> Iterator[list[str]]:
     chunk: list[str] = []
     for value in values:
@@ -156,16 +173,25 @@ class OpenAlexClient:
         to_year: int | None = None,
     ) -> Iterator[Work]:
         """Enumerate works under a topic, optionally bounded by publication year."""
-        filters = [f"primary_topic.id:{strip_id_prefix(topic_id)}"]
-        if from_year is not None:
-            filters.append(f"from_publication_date:{from_year}-01-01")
-        if to_year is not None:
-            filters.append(f"to_publication_date:{to_year}-12-31")
-        yield from self._paginate({"filter": ",".join(filters)})
+        filter_ = _filter(topic_id=topic_id, from_year=from_year, to_year=to_year)
+        yield from self._paginate({"filter": filter_})
 
-    def citing_works(self, work_id: str) -> Iterator[Work]:
-        """Works that cite the given work, i.e. its descendants."""
-        yield from self._paginate({"filter": f"cites:{strip_id_prefix(work_id)}"})
+    def citing_works(
+        self,
+        work_id: str,
+        *,
+        topic_id: str | None = None,
+        from_year: int | None = None,
+        to_year: int | None = None,
+    ) -> Iterator[Work]:
+        """Works that cite the given work, i.e. its descendants, optionally within a topic."""
+        filter_ = _filter(
+            f"cites:{strip_id_prefix(work_id)}",
+            topic_id=topic_id,
+            from_year=from_year,
+            to_year=to_year,
+        )
+        yield from self._paginate({"filter": filter_})
 
     def referenced_works(self, work_id: str) -> Iterator[Work]:
         """Works the given work cites, i.e. its immediate ancestors."""

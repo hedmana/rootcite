@@ -131,6 +131,21 @@ def test_citing_works_uses_cites_filter():
     assert captured["filter"] == "cites:W1"
 
 
+def test_citing_works_can_be_bounded_by_topic_and_years():
+    captured = {}
+
+    def handler(request):
+        captured["filter"] = request.url.params["filter"]
+        return httpx.Response(200, json={"results": [], "meta": {}})
+
+    list(client_for(handler).citing_works("W1", topic_id="T11273", from_year=2015, to_year=2020))
+
+    assert captured["filter"] == (
+        "cites:W1,primary_topic.id:T11273,"
+        "from_publication_date:2015-01-01,to_publication_date:2020-12-31"
+    )
+
+
 def test_works_batches_ids_into_or_filters():
     ids = [f"W{n}" for n in range(MAX_IDS_PER_FILTER + 10)]
     batches = []
