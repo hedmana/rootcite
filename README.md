@@ -67,6 +67,7 @@ Each stage writes into `data/` and the next reads from there.
 
 ```sh
 uv run python -m graph.crawler --field gnn      # snowball crawl from the seed papers
+uv run python -m graph.semanticscholar --field gnn  # recover citations OpenAlex lost
 uv run python -m graph.build --field gnn        # clean it into a dated snapshot
 uv run python -m gnn.dataset --field gnn        # cut the temporal link-prediction split
 uv run python -m gnn.train --field gnn          # fit, and score on citations it never saw
@@ -74,6 +75,11 @@ uv run python -m gnn.evaluate --field gnn       # score it beside the heuristics
 uv run python -m gnn.lineages --field gnn       # judge the rankings against fields/gold/gnn.yaml
 uv run python -m llm.narrative --field gnn --target W2519887557
 ```
+
+Recovering citations is optional. OpenAlex lists about one reference in eight
+under a record it has since deleted, and Semantic Scholar still has most of them.
+It takes a few minutes on the shared rate limit; an `S2_API_KEY` in the
+environment raises it.
 
 The last command is what the rest is for: the ancestors that carried the paper,
 why, and cited to the abstracts it read. `python -m gnn.originators` prints the
