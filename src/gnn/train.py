@@ -4,6 +4,13 @@ Each split is evaluated on the message-passing graph it is allowed to see, and
 the test split is only touched once, after the best validation checkpoint has
 been restored. Selecting a checkpoint on the test edges would make the number
 reported at the end a training metric wearing a disguise.
+
+Training has to pose the question evaluation does. A validation or test
+citation comes from a paper the message graph has never met: nothing it cites
+and nothing citing it is on record yet. Supervised on citations the graph
+already holds, a model learns to recognise edges it can see, and that does not
+carry over. So every epoch cuts a share of the citing papers out of the graph
+and scores only their citations, against negatives drawn afresh.
 """
 
 from __future__ import annotations
@@ -22,7 +29,13 @@ from torch.nn import functional
 from torch_geometric.data import Data
 from torch_geometric.utils import to_undirected
 
-from gnn.dataset import LinkDataset, load_dataset
+from gnn.dataset import (
+    LinkDataset,
+    load_dataset,
+    publication_order,
+    sample_negatives,
+    with_degrees,
+)
 from gnn.metrics import average_precision, roc_auc
 from gnn.model import LinkPredictor, ModelConfig
 from graph.build import latest_snapshot
@@ -35,10 +48,11 @@ SPLITS = ("train", "val", "test")
 
 @dataclass
 class TrainConfig:
-    epochs: int = 200
+    epochs: int = 400
     learning_rate: float = 0.01
     weight_decay: float = 5e-4
-    patience: int = 20
+    patience: int = 40
+    held_out: float = 0.2
     seed: int = 0
 
 
@@ -71,19 +85,47 @@ class TrainingReport:
             )
 
 
-def _message_passing(dataset: LinkDataset) -> dict[str, Tensor]:
-    """Each split's own view of the graph, made undirected once rather than per epoch."""
-    count = len(dataset.node_ids)
+View = tuple[Tensor, Tensor]
+
+
+def _view(x: Tensor, edge_index: Tensor) -> View:
+    """Features and undirected message graph, both taken from the same citations."""
+    return with_degrees(x, edge_index), to_undirected(edge_index, num_nodes=x.size(0))
+
+
+def _views(dataset: LinkDataset) -> dict[str, View]:
+    """Each split's own view of the graph, built once rather than per epoch."""
     return {
-        split: to_undirected(getattr(dataset, split).edge_index, num_nodes=count)
+        split: _view(getattr(dataset, split).x, getattr(dataset, split).edge_index)
         for split in SPLITS
     }
 
 
-def evaluate(model: LinkPredictor, split: Data, message: Tensor) -> Metrics:
+def _record(dataset: LinkDataset) -> Tensor:
+    """Every citation on record, as sorted keys, so no negative is one that happened.
+
+    The test split sees everything but its own positives, so the two together
+    are the whole record.
+    """
+    test = dataset.test
+    edges = torch.cat([test.edge_index, test.edge_label_index[:, test.edge_label == 1]], dim=1)
+    return (edges[0] * len(dataset.node_ids) + edges[1]).sort().values
+
+
+def _cold_start(
+    positive: Tensor, past: Tensor, share: float, count: int, generator: torch.Generator
+) -> tuple[Tensor, Tensor]:
+    """One epoch's supervision, and the graph the model may see while scoring it."""
+    sources = positive[0].unique()
+    held = torch.zeros(count, dtype=torch.bool)
+    held[sources[torch.rand(sources.numel(), generator=generator) < share]] = True
+    return positive[:, held[positive[0]]], past[:, ~(held[past[0]] | held[past[1]])]
+
+
+def evaluate(model: LinkPredictor, split: Data, view: View) -> Metrics:
     model.eval()
     with torch.no_grad():
-        scores = model(split.x, message, split.edge_label_index)
+        scores = model(*view, split.edge_label_index)
     if not scores.numel():
         return Metrics(loss=float("nan"), roc_auc=float("nan"), average_precision=float("nan"))
     return Metrics(
@@ -93,11 +135,18 @@ def evaluate(model: LinkPredictor, split: Data, message: Tensor) -> Metrics:
     )
 
 
-def _step(model: LinkPredictor, split: Data, message: Tensor, optimizer: torch.optim.Optimizer):
+def _step(
+    model: LinkPredictor,
+    view: View,
+    positive: Tensor,
+    negative: Tensor,
+    optimizer: torch.optim.Optimizer,
+) -> float:
     model.train()
     optimizer.zero_grad()
-    scores = model(split.x, message, split.edge_label_index)
-    loss = functional.binary_cross_entropy_with_logits(scores, split.edge_label)
+    scores = model(*view, torch.cat([positive, negative], dim=1))
+    labels = torch.cat([torch.ones(positive.size(1)), torch.zeros(negative.size(1))])
+    loss = functional.binary_cross_entropy_with_logits(scores, labels)
     loss.backward()
     optimizer.step()
     return float(loss.detach())
@@ -117,13 +166,22 @@ def train(
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
     )
-    message = _message_passing(dataset)
+    views = _views(dataset)
+    count = len(dataset.node_ids)
+    train_split = dataset.train
+    positive = train_split.edge_label_index[:, train_split.edge_label == 1]
+    order, record = publication_order(train_split.x), _record(dataset)
+    generator = torch.Generator().manual_seed(config.seed)
 
     best_state = copy.deepcopy(model.state_dict())
     best_epoch, best_score, epoch = 0, -math.inf, 0
     for epoch in range(1, config.epochs + 1):
-        loss = _step(model, dataset.train, message["train"], optimizer)
-        validation = evaluate(model, dataset.val, message["val"])
+        supervised, message = _cold_start(
+            positive, train_split.edge_index, config.held_out, count, generator
+        )
+        negative, _ = sample_negatives(supervised, order, record, count, generator)
+        loss = _step(model, _view(train_split.x, message), supervised, negative, optimizer)
+        validation = evaluate(model, dataset.val, views["val"])
 
         # An empty validation split has nothing to rank, so fit is all there is to go on.
         score = validation.average_precision
@@ -139,9 +197,9 @@ def train(
     report = TrainingReport(
         epochs_run=epoch,
         best_epoch=best_epoch,
-        train=evaluate(model, dataset.train, message["train"]),
-        val=evaluate(model, dataset.val, message["val"]),
-        test=evaluate(model, dataset.test, message["test"]),
+        train=evaluate(model, dataset.train, views["train"]),
+        val=evaluate(model, dataset.val, views["val"]),
+        test=evaluate(model, dataset.test, views["test"]),
         model=asdict(model.config),
         training=asdict(config),
     )
@@ -196,6 +254,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--learning-rate", type=float, default=TrainConfig.learning_rate)
     parser.add_argument("--weight-decay", type=float, default=TrainConfig.weight_decay)
     parser.add_argument("--patience", type=int, default=TrainConfig.patience)
+    parser.add_argument(
+        "--held-out",
+        type=float,
+        default=TrainConfig.held_out,
+        help="share of citing papers cut from the graph each epoch",
+    )
     parser.add_argument("--seed", type=int, default=TrainConfig.seed)
     args = parser.parse_args(argv)
 
@@ -214,6 +278,7 @@ def main(argv: list[str] | None = None) -> None:
             learning_rate=args.learning_rate,
             weight_decay=args.weight_decay,
             patience=args.patience,
+            held_out=args.held_out,
             seed=args.seed,
         ),
     )

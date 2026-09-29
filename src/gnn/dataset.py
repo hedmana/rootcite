@@ -40,6 +40,11 @@ FEATURE_NAMES = (
     "log_author_count",
 )
 
+YEAR, DATED, IN_DEGREE, OUT_DEGREE = (
+    FEATURE_NAMES.index(name)
+    for name in ("year_scaled", "is_dated", "log_in_degree", "log_out_degree")
+)
+
 UNDATED = -1
 SAMPLING_ATTEMPTS = 16
 
@@ -115,16 +120,31 @@ def _features(graph: nx.DiGraph, node_ids: list[str], past: Tensor, years: Tenso
     authors = torch.tensor(
         [len(graph.nodes[node].get("authors") or []) for node in node_ids], dtype=torch.float
     )
-    return torch.stack(
-        [
-            scaled.float(),
-            dated.float(),
-            torch.bincount(past[1], minlength=count).float().log1p(),
-            torch.bincount(past[0], minlength=count).float().log1p(),
-            authors.log1p(),
-        ],
-        dim=1,
-    )
+    unset = torch.zeros(count)
+    features = torch.stack([scaled.float(), dated.float(), unset, unset, authors.log1p()], dim=1)
+    return with_degrees(features, past)
+
+
+def with_degrees(x: Tensor, edge_index: Tensor) -> Tensor:
+    """`x` with its degree columns counted over `edge_index`.
+
+    Degrees describe a graph, so they have to be counted over the one the model
+    passes messages on. Counted over any other, they tell it about edges it was
+    not shown.
+    """
+    x = x.clone()
+    x[:, IN_DEGREE] = torch.bincount(edge_index[1], minlength=x.size(0)).float().log1p()
+    x[:, OUT_DEGREE] = torch.bincount(edge_index[0], minlength=x.size(0)).float().log1p()
+    return x
+
+
+def publication_order(x: Tensor) -> Tensor:
+    """Each work's place in time as its features record it, UNDATED where they record none.
+
+    Scaled years keep the order and the ties of the years they came from, which
+    is all `sample_negatives` asks of them.
+    """
+    return torch.where(x[:, DATED] > 0, x[:, YEAR], UNDATED)
 
 
 def _cut_points(edge_years: Tensor, val_fraction: float, test_fraction: float) -> tuple[int, int]:

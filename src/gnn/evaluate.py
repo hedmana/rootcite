@@ -29,7 +29,7 @@ from torch.nn import functional
 from torch_geometric.data import Data
 from torch_geometric.utils import to_undirected
 
-from gnn.dataset import build_dataset, index_graph, sample_negatives
+from gnn.dataset import build_dataset, index_graph, sample_negatives, with_degrees
 from gnn.metrics import positive_ranks, roc_auc
 from gnn.model import LinkPredictor
 from gnn.train import TrainConfig, train
@@ -147,7 +147,10 @@ def evaluate_cut(
     }
     model.eval()
     with torch.no_grad():
-        z = model.encode(dataset.test.x, to_undirected(dataset.test.edge_index, num_nodes=count))
+        z = model.encode(
+            with_degrees(dataset.test.x, dataset.test.edge_index),
+            to_undirected(dataset.test.edge_index, num_nodes=count),
+        )
 
     rows: list[Row] = []
     for sampler, year_matched in SAMPLERS.items():
