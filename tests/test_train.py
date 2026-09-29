@@ -6,7 +6,7 @@ from torch_geometric.utils import to_undirected
 
 from gnn.dataset import build_dataset
 from gnn.model import ModelConfig
-from gnn.train import TrainConfig, load_model, save_model, train
+from gnn.train import TrainConfig, _cold_start, load_model, save_model, train
 
 
 def preferential_attachment(size=300, per_year=10, links=4, seed=0):
@@ -41,6 +41,20 @@ def test_the_model_learns_a_signal_that_survives_the_split():
 
     assert report.test.roc_auc > 0.7
     assert report.test.average_precision > 0.7
+
+
+def test_a_cold_start_epoch_cuts_its_citing_papers_out_of_the_graph():
+    split = dataset()
+    positive = split.train.edge_label_index[:, split.train.edge_label == 1]
+
+    supervised, message = _cold_start(
+        positive, split.train.edge_index, 0.3, len(split.node_ids), torch.Generator().manual_seed(0)
+    )
+
+    held = supervised[0].unique()
+    assert 0 < held.numel() < positive[0].unique().numel()
+    assert not torch.isin(message, held).any()
+    assert int(torch.isin(positive[0], held).sum()) == supervised.size(1)
 
 
 def test_training_stops_once_validation_stops_improving():
