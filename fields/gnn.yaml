@@ -37,6 +37,12 @@ seed_papers:
 exclude_works:
   - W2964015378  # cited 2347 times inside the graph, titled as a 2025 vulnerability-detection paper
 
+# OpenAlex records filed under another work's title. Cleaning restores the
+# title and drops the abstract, which came from the same wrong record.
+corrected_titles:
+  # ChebNet (Defferrard et al., 2016), filed as a GSP'18 workshop lecture.
+  W2964321699: Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering
+
 crawl:
   # How many citation hops to expand outward from the seeds.
   hop_depth: 2
