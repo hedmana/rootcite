@@ -18,9 +18,11 @@ def roc_auc(scores: Tensor, labels: Tensor) -> float:
     if not hits or not misses:
         return float("nan")
 
-    # Ranks by position, so equal scores are ordered arbitrarily rather than tied.
-    ranks = torch.empty_like(scores, dtype=torch.float)
-    ranks[scores.argsort()] = torch.arange(1, scores.numel() + 1, dtype=torch.float)
+    # Equal scores share the mean of the ranks they span, so a tie counts as half
+    # a win. Heuristic scores tie constantly, and ordering them by position would
+    # let the order the labels were concatenated in decide the metric.
+    _, group, sizes = torch.unique(scores, return_inverse=True, return_counts=True)
+    ranks = (sizes.cumsum(0) - (sizes - 1) / 2)[group]
     return float((ranks[positives].sum() - hits * (hits + 1) / 2) / (hits * misses))
 
 
