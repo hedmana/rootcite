@@ -78,7 +78,7 @@ def test_an_assessment_judges_covers_and_stresses_every_scorer():
 
     assert result["targets_in_graph"] == "2/3"
     assert (dev["coverage"], test["coverage"]) == ("1/2", "1/1")
-    assert set(dev["scorers"]) >= {"learned", "uniform_flow", "in_degree", "gateway"}
+    assert set(dev["scorers"]) >= {"learned", "model_only", "uniform_flow", "in_degree"}
     assert dev["scorers"]["learned"]["recall"] == 1.0
     assert dev["scorers"]["learned"]["found"] == "1/2"
     assert "U" not in result["targets"][0]["scorers"]["learned"]["top"]
