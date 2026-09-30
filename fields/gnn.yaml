@@ -35,13 +35,34 @@ seed_papers:
 # the pipeline cannot detect, so they would surface in rankings under a name
 # that is not theirs.
 exclude_works:
-  - W2964015378  # cited 2347 times inside the graph, titled as a 2025 vulnerability-detection paper
+  - W4292779060  # titled as a 2023 essay on AI consciousness; too few citers to tell what it is
 
 # OpenAlex records filed under another work's title. Cleaning restores the
 # title and drops the abstract, which came from the same wrong record.
 corrected_titles:
   # ChebNet (Defferrard et al., 2016), filed as a GSP'18 workshop lecture.
   W2964321699: Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering
+  # Shchur et al. 2018, filed as a paper on multimodal temporal GNNs.
+  W2900470550: Pitfalls of Graph Neural Network Evaluation
+  # Bello et al. 2016, filed as a paper on system architectures. The authors are still wrong.
+  W2952332632: Neural Combinatorial Optimization with Reinforcement Learning
+
+# OpenAlex records of a work the graph holds under another id, each folded into
+# that one with its citations. Records that share a title, a first author and
+# roughly a year are folded without being named here; these are the ones filed
+# under another work's metadata, named by what their citers cite on Semantic
+# Scholar.
+duplicate_works:
+  W2964015378: W2519887557  # GCN, filed as a 2025 paper on vulnerability detection
+  W4294558607: W2624431344  # GraphSAGE, filed as a 2024 paper on maximum independent sets
+  W2962711740: W2894175828  # GIN, filed as a 2025 paper on Kolmogorov-Arnold networks
+  W4322614756: W2554952599  # VGAE, filed as a 2025 paper on road networks
+  W4385245566: W2626778328  # Attention Is All You Need, filed as a 2023 paper on tutoring systems
+  W2964121744: W1522301498  # Adam, filed as a 2026 paper on automated research
+  W4293651439: W2755092149  # Hamilton et al. 2017, filed as a 2026 database paper
+  W2896457183: W2963341956  # BERT, filed as a 2018 paper on health support
+  W4285723986: W2766453196  # GAT: a 2020 book chapter of the same name, cited for it from 2018 on
+  W4289389616: W2900763475  # APPNP, under its first author's later name
 
 crawl:
   # How many citation hops to expand outward from the seeds.
