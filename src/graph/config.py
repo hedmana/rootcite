@@ -35,6 +35,7 @@ class FieldConfig(BaseModel):
     seed_papers: list[str] = Field(default_factory=list)
     exclude_works: list[str] = Field(default_factory=list)
     corrected_titles: dict[str, str] = Field(default_factory=dict)
+    duplicate_works: dict[str, str] = Field(default_factory=dict)
     crawl: CrawlConfig
 
     @field_validator("description")

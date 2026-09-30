@@ -18,7 +18,7 @@ from graph.build import (
 from graph.config import DateRange
 
 
-def node(work_id, year=2015, abstract="an abstract", title=None):
+def node(work_id, year=2015, abstract="an abstract", title=None, authors=("Ada Lovelace",)):
     return {
         "id": work_id,
         "title": title if title is not None else f"Paper {work_id}",
@@ -27,7 +27,7 @@ def node(work_id, year=2015, abstract="an abstract", title=None):
         "publication_date": f"{year}-01-01",
         "cited_by_count": 10,
         "topic_id": "T1",
-        "authors": ["Ada Lovelace"],
+        "authors": list(authors),
     }
 
 
@@ -84,6 +84,83 @@ def test_a_record_filed_under_another_title_gets_its_own_and_loses_the_abstract(
     assert kept.loc["B", "title"] == "ChebNet"
     assert is_missing(kept.loc["B", "abstract"])
     assert kept.loc["A", "title"] == "Paper A"
+
+
+def test_a_named_duplicate_is_folded_into_its_work_with_its_citations():
+    nodes, edges = frames(
+        [node("A"), node("B"), node("C", title="A tutoring paper"), node("D")],
+        [("A", "B"), ("A", "C"), ("D", "C")],
+    )
+
+    nodes, edges, report = clean(nodes, edges, merge={"C": "B"})
+
+    assert report.merged_nodes == 1
+    assert sorted(nodes["id"]) == ["A", "B", "D"]
+    assert sorted(edges.itertuples(index=False, name=None)) == [("A", "B"), ("D", "B")]
+
+
+def test_a_duplicate_of_a_work_outside_the_crawl_is_left_alone():
+    nodes, edges = frames([node("A"), node("C")], [("A", "C")])
+
+    nodes, _, report = clean(nodes, edges, merge={"C": "B"})
+
+    assert report.merged_nodes == 0
+    assert sorted(nodes["id"]) == ["A", "C"]
+
+
+def test_a_preprint_folds_into_its_more_cited_venue_version():
+    nodes, edges = frames(
+        [
+            node("A"),
+            node("D"),
+            node("E"),
+            node("P", 2016, None, "How Powerful are GNNs?", ["K. Xu"]),
+            node("V", 2018, "an abstract", "How powerful are GNNs", ["Keyulu Xu", "Weihua Hu"]),
+        ],
+        [("A", "V"), ("D", "V"), ("E", "P")],
+    )
+
+    nodes, edges, report = clean(nodes, edges)
+
+    assert report.merged_nodes == 1
+    assert "P" not in set(nodes["id"])
+    assert sorted(edges["target"]) == ["V", "V", "V"]
+
+
+def test_the_kept_version_takes_an_abstract_only_its_duplicate_has():
+    nodes, edges = frames(
+        [node("A"), node("D"), node("P", abstract="the real one"), node("V", abstract=None)],
+        [("A", "V"), ("D", "V"), ("A", "P")],
+    )
+    nodes["title"] = nodes["id"].map({"P": "ChebNet", "V": "ChebNet"}).fillna(nodes["title"])
+
+    nodes, _, _ = clean(nodes, edges)
+
+    assert nodes.set_index("id").loc["V", "abstract"] == "the real one"
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        node("Q", 2016, title="Deep learning", authors=["Ian Goodfellow", "Yoshua Bengio"]),
+        node("Q", 2021, title="Deep learning", authors=["Yann LeCun"]),
+    ],
+)
+def test_one_title_by_another_first_author_or_years_apart_is_another_work(other):
+    nodes, edges = frames(
+        [
+            node("A"),
+            node("B", 2022),
+            node("P", 2015, title="Deep learning", authors=["Yann LeCun", "Yoshua Bengio"]),
+            other,
+        ],
+        [("A", "P"), ("B", "Q"), ("B", "A")],
+    )
+
+    nodes, _, report = clean(nodes, edges)
+
+    assert report.merged_nodes == 0
+    assert {"P", "Q"} <= set(nodes["id"])
 
 
 @pytest.mark.parametrize(
