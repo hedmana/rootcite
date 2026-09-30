@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
@@ -28,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 # A preprint can be cited a year before the venue date OpenAlex gives it.
 PREPRINT_SLACK = 1
+
+# A preprint and its venue version are dated at most this many years apart.
+VERSION_GAP = 2
 
 # Citations `graph.semanticscholar` recovered, kept apart from the crawl's own.
 RECOVERED_EDGES = "recovered_edges.parquet"
@@ -56,6 +60,7 @@ class CleaningReport:
     raw_edges: int = 0
     excluded_nodes: int = 0
     retitled_nodes: int = 0
+    merged_nodes: int = 0
     renamed_authors: int = 0
     duplicate_nodes: int = 0
     duplicate_edges: int = 0
@@ -145,6 +150,7 @@ def clean(
     date_range: DateRange | None = None,
     exclude: Iterable[str] = (),
     retitle: Mapping[str, str] | None = None,
+    merge: Mapping[str, str] | None = None,
     largest_component_only: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, CleaningReport]:
     """Reduce raw crawl tables to a consistent node set and edge set."""
@@ -166,6 +172,11 @@ def clean(
 
     if "authors" in nodes:
         nodes["authors"], report.renamed_authors = _rename_authors(nodes["authors"])
+
+    held = len(nodes)
+    nodes, edges = _fold(nodes, edges, merge or {})
+    nodes, edges = _fold(nodes, edges, _versions(nodes, edges))
+    report.merged_nodes = held - len(nodes)
 
     if date_range is not None:
         in_range = nodes["publication_year"].map(date_range.contains)
@@ -194,6 +205,75 @@ def clean(
     report.nodes = len(nodes)
     report.edges = len(edges)
     return nodes, edges, report
+
+
+def _fold(
+    nodes: pd.DataFrame, edges: pd.DataFrame, duplicates: Mapping[str, str]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Fold each duplicate record into the one it duplicates, citations and all."""
+    held = set(nodes["id"])
+    duplicates = {dup: kept for dup, kept in duplicates.items() if dup in held and kept in held}
+    if not duplicates:
+        return nodes, edges
+
+    edges = edges.assign(
+        source=edges["source"].map(duplicates).fillna(edges["source"]),
+        target=edges["target"].map(duplicates).fillna(edges["target"]),
+    )
+    folded = nodes["id"].isin(duplicates.keys())
+    if "abstract" in nodes:
+        spare = nodes[folded & ~nodes["abstract"].map(is_missing)]
+        spare = spare.set_index(spare["id"].map(duplicates))["abstract"]
+        spare = spare[~spare.index.duplicated()]
+        lacking = ~folded & nodes["abstract"].map(is_missing) & nodes["id"].isin(spare.index)
+        nodes = nodes.copy()
+        nodes.loc[lacking, "abstract"] = nodes.loc[lacking, "id"].map(spare)
+    return nodes[~folded], edges
+
+
+def _versions(nodes: pd.DataFrame, edges: pd.DataFrame) -> dict[str, str]:
+    """Preprint and venue records of one work, each mapped to the one the crawl cites most.
+
+    They share a title, a first author's family name and roughly a year. A title
+    alone is not enough: `Deep learning` is both LeCun et al. 2015 and Goodfellow
+    et al. 2016. A given name is too much: DiffPool's first author is both Rex and
+    Zhitao Ying.
+    """
+    if "authors" not in nodes or nodes.empty:
+        return {}
+    # A version OpenAlex dates by a late reprint is dated by its citers instead.
+    records, _ = _redate(nodes, edges)
+    records = records.assign(
+        key=records["title"].map(_title_key),
+        first=records["authors"].map(_first_author),
+        cited=records["id"].map(edges["target"].value_counts()).fillna(0),
+    )
+    records = records[(records["key"] != "") & (records["first"] != "")]
+    records = records[records.duplicated(["key", "first"], keep=False)]
+    duplicates = {}
+    for _, group in records.sort_values(["cited", "id"], ascending=[False, True]).groupby(
+        ["key", "first"], sort=False
+    ):
+        kept, *others = group.itertuples(index=False)
+        for other in others:
+            if abs(other.publication_year - kept.publication_year) <= VERSION_GAP:
+                duplicates[other.id] = kept.id
+    return duplicates
+
+
+def _title_key(title: object) -> str:
+    return "" if is_missing(title) else re.sub(r"[^a-z0-9]", "", str(title).lower())
+
+
+def _first_author(names: object) -> str:
+    """The first author's family name; a name with no Latin letters as written."""
+    if not isinstance(names, list | tuple | np.ndarray) or len(names) == 0:
+        return ""
+    name = str(names[0])
+    words = re.findall(
+        r"[a-z]+", unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    )
+    return words[-1] if words else "".join(name.split())
 
 
 def _redate(nodes: pd.DataFrame, edges: pd.DataFrame) -> tuple[pd.DataFrame, int]:
@@ -323,6 +403,7 @@ def build_field(
         date_range=config.crawl.date_range,
         exclude=config.exclude_works,
         retitle=config.corrected_titles,
+        merge=config.duplicate_works,
         largest_component_only=largest_component_only,
     )
     surviving = set(nodes["id"])
