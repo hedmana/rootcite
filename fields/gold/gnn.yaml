@@ -139,7 +139,7 @@ lineages:
       - [W2519887557]  # GCN: a neighbourhood aggregation model it adds layer aggregation to
       - [W2624431344]  # GraphSAGE: likewise
 
-  - target: W2893944917  # Deep Graph Infomax. (2018)
+  - target: W2963782635  # Deep Graph Infomax (2018), which W2893944917 is folded into
     split: dev
     originators:
       - [W2951873722]  # Hjelm et al. 2018, Deep InfoMax: follows its intuitions
