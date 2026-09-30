@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
@@ -31,6 +32,11 @@ PREPRINT_SLACK = 1
 # Citations `graph.semanticscholar` recovered, kept apart from the crawl's own.
 RECOVERED_EDGES = "recovered_edges.parquet"
 
+# Library catalogues file a person as `Last, First 1968-`, which a list of names
+# reads as two people.
+LIFE_DATES = re.compile(r"\s+\d{4}-(\d{4})?$")
+FAMILY_NAME_FIRST = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]")
+
 NODE_ATTRIBUTES = (
     "title",
     "abstract",
@@ -50,6 +56,7 @@ class CleaningReport:
     raw_edges: int = 0
     excluded_nodes: int = 0
     retitled_nodes: int = 0
+    renamed_authors: int = 0
     duplicate_nodes: int = 0
     duplicate_edges: int = 0
     out_of_range_nodes: int = 0
@@ -98,6 +105,30 @@ def is_missing(value: object) -> bool:
     return value is None or (isinstance(value, float) and pd.isna(value)) or value == ""
 
 
+def display_name(name: str) -> str:
+    """`Schölkopf, Bernhard 1968-` as `Bernhard Schölkopf`; a family-name-first script keeps it."""
+    name = LIFE_DATES.sub("", name)
+    if name.count(",") != 1:
+        return name
+    family, given = (part.strip() for part in name.split(","))
+    ordered = (family, given) if FAMILY_NAME_FIRST.search(name) else (given, family)
+    return " ".join(part for part in ordered if part)
+
+
+def _rename_authors(authors: pd.Series) -> tuple[pd.Series, int]:
+    renamed = 0
+
+    def rename(names: Iterable[str] | None) -> list[str] | None:
+        nonlocal renamed
+        if names is None:
+            return None
+        shown = [display_name(name) for name in names]
+        renamed += sum(old != new for old, new in zip(names, shown, strict=True))
+        return shown
+
+    return authors.map(rename), renamed
+
+
 def load_raw(raw_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Read the crawler's raw node and edge tables, with any recovered citations."""
     nodes = pd.read_parquet(raw_dir / "nodes.parquet")
@@ -132,6 +163,9 @@ def clean(
     nodes.loc[wrong, "title"] = nodes.loc[wrong, "id"].map(retitle or {})
     if "abstract" in nodes:
         nodes.loc[wrong, "abstract"] = None
+
+    if "authors" in nodes:
+        nodes["authors"], report.renamed_authors = _rename_authors(nodes["authors"])
 
     if date_range is not None:
         in_range = nodes["publication_year"].map(date_range.contains)

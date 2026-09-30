@@ -6,6 +6,7 @@ import pytest
 
 from graph.build import (
     clean,
+    display_name,
     is_missing,
     latest_snapshot,
     load_snapshot,
@@ -83,6 +84,36 @@ def test_a_record_filed_under_another_title_gets_its_own_and_loses_the_abstract(
     assert kept.loc["B", "title"] == "ChebNet"
     assert is_missing(kept.loc["B", "abstract"])
     assert kept.loc["A", "title"] == "Paper A"
+
+
+@pytest.mark.parametrize(
+    "catalogued,shown",
+    [
+        ("Schölkopf, Bernhard 1968-", "Bernhard Schölkopf"),
+        ("Tishby, Naftali 1952-2021", "Naftali Tishby"),
+        ("Hamilton, William L.", "William L. Hamilton"),
+        (", Jon", "Jon"),
+        ("阿久津, 達也", "阿久津 達也"),
+        ("Thomas N. Kipf", "Thomas N. Kipf"),
+        ("GREC 1997 Nancy", "GREC 1997 Nancy"),
+        (
+            "Sandia National Laboratories, Albuquerque, NM",
+            "Sandia National Laboratories, Albuquerque, NM",
+        ),
+    ],
+)
+def test_a_catalogue_name_reads_given_name_first(catalogued, shown):
+    assert display_name(catalogued) == shown
+
+
+def test_catalogue_names_are_rewritten_and_counted():
+    nodes, edges = frames([node("A"), node("B")], [("A", "B")])
+    nodes.at[1, "authors"] = ["Schölkopf, Bernhard 1968-", "Alexander Zien"]
+
+    nodes, _, report = clean(nodes, edges)
+
+    assert report.renamed_authors == 1
+    assert nodes.set_index("id").loc["B", "authors"] == ["Bernhard Schölkopf", "Alexander Zien"]
 
 
 def test_nodes_outside_the_date_range_are_dropped_with_their_edges():
